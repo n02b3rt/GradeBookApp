@@ -1,0 +1,9 @@
+﻿@page "/teacher/dashboard"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize(Roles = "Teacher")]
+
+<h1>Teacher Dashboard</h1>
+
+<p>Witaj, Nauczycielu! To jest Twój panel nauczycielski.</p>
+
+<!-- Dodaj tutaj dodatkowe funkcjonalności nauczyciela -->

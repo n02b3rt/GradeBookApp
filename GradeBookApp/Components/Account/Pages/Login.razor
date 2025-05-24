@@ -1,0 +1,127 @@
+﻿@page "/Account/Login"
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using GradeBookApp.Data
+@using GradeBookApp.Data.Entities
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Log in</PageTitle>
+
+
+<div class="row w-100 mt-auto justify-content-center align-content-center" style="height: 100vh">
+    <div class="col-md-4">
+        <section>
+            
+            <StatusMessage Message="@errorMessage"/>
+            <EditForm Model="Input" method="post" OnValidSubmit="LoginUser" FormName="login">
+                <DataAnnotationsValidator/>
+                <div class="w-100 text-center mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="256px" viewBox="0 -960 960 960" width="256px" fill="#f39c12">
+                        <path d="M480-120 200-272v-240L40-600l440-240 440 240v320h-80v-276l-80 44v240L480-120Zm0-332 274-148-274-148-274 148 274 148Zm0 241 200-108v-151L480-360 280-470v151l200 108Zm0-241Zm0 90Zm0 0Z"/>
+                    </svg>
+                    <h1>Zaloguj się!</h1>
+                </div>
+
+                <hr/>
+                <ValidationSummary class="text-danger" role="alert"/>
+                <div class="form-floating mb-3">
+                    <InputText @bind-Value="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com"/>
+                    <label for="email" class="form-label">Email</label>
+                    <ValidationMessage For="() => Input.Email" class="text-danger"/>
+                </div>
+                <div class="form-floating mb-3">
+                    <InputText type="password" @bind-Value="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password"/>
+                    <label for="password" class="form-label">Password</label>
+                    <ValidationMessage For="() => Input.Password" class="text-danger"/>
+                </div>
+                <div class="checkbox mb-3">
+                    <label class="form-label">
+                        <InputCheckbox @bind-Value="Input.RememberMe" class="darker-border-checkbox form-check-input"/>
+                        Remember me
+                    </label>
+                </div>
+                <div>
+                    <button type="submit" class="w-100 btn btn-lg btn-primary" style="background: #f39c12">Log in</button>
+                </div>
+            </EditForm>
+        </section>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
+
+    public async Task LoginUser()
+    {
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User logged in.");
+
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            if (user != null)
+            {
+                var roles = await UserManager.GetRolesAsync(user);
+
+                // Przekierowanie wg ról
+                if (roles.Contains("Admin"))
+                {
+                    NavigationManager.NavigateTo("/admin/dashboard");
+                }
+                else if (roles.Contains("Teacher"))
+                {
+                    NavigationManager.NavigateTo("/teacher/dashboard");
+                }
+                else if (roles.Contains("Student"))
+                {
+                    NavigationManager.NavigateTo("/student/dashboard");
+                }
+                else
+                {
+                    // Domyślne przekierowanie jeśli brak roli
+                    NavigationManager.NavigateTo("/");
+                }
+            }
+            else
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+        else if (result.RequiresTwoFactor)
+        {
+            // Jeśli nie używasz 2FA, ten blok możesz usunąć
+            errorMessage = "Two-factor authentication is required, but currently not supported.";
+        }
+        else if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account locked out.");
+            errorMessage = "User account is locked out.";
+        }
+        else
+        {
+            errorMessage = "Error: Invalid login attempt.";
+        }
+    }
+
+    private sealed class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = "";
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [Display(Name = "Remember me?")]
+        public bool RememberMe { get; set; }
+    }
+}

@@ -1,0 +1,50 @@
+﻿@using System.Security.Claims
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager NavigationManager
+
+<header class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">GradeBookApp</a>
+        <nav>
+            @if (user.Identity?.IsAuthenticated ?? false)
+            {
+                if (user.IsInRole("Admin"))
+                {
+                    <a href="/admin/dashboard" class="nav-link">Admin Dashboard</a>
+                    <a href="/admin/users" class="nav-link">Manage Users</a>
+                }
+                else if (user.IsInRole("Teacher"))
+                {
+                    <a href="/teacher/dashboard" class="nav-link">Teacher Dashboard</a>
+                    <a href="/teacher/classes" class="nav-link">My Classes</a>
+                }
+                else if (user.IsInRole("Student"))
+                {
+                    <a href="/student/dashboard" class="nav-link">Student Dashboard</a>
+                    <a href="/student/grades" class="nav-link">My Grades</a>
+                }
+                <a href="#" @onclick="Logout" class="nav-link">Logout</a>
+            }
+            else
+            {
+                <a href="/account/login" class="nav-link">Log in</a>
+            }
+        </nav>
+    </div>
+</header>
+
+@code {
+    private ClaimsPrincipal user = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        user = authState.User;
+    }
+
+    private async Task Logout()
+    {
+        // Wywołaj endpoint wylogowania lub przekieruj, zależnie od implementacji
+        NavigationManager.NavigateTo("/account/logout", forceLoad: true);
+    }
+}
