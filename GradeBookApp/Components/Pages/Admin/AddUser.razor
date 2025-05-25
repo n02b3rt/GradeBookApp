@@ -1,0 +1,54 @@
+﻿@page "/admin/dashboard/users/add"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+<h3>Dodaj użytkownika</h3>
+
+<EditForm Model="newUser" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div>
+        <label>Username:</label>
+        <InputText @bind-Value="newUser.UserName" />
+    </div>
+    <div>
+        <label>Email:</label>
+        <InputText @bind-Value="newUser.Email" />
+    </div>
+    <div>
+        <label>Imię:</label>
+        <InputText @bind-Value="newUser.FirstName" />
+    </div>
+    <div>
+        <label>Nazwisko:</label>
+        <InputText @bind-Value="newUser.LastName" />
+    </div>
+    <div>
+        <label>Hasło:</label>
+        <InputText @bind-Value="password" type="password" />
+    </div>
+
+    <button type="submit">Dodaj</button>
+</EditForm>
+
+@code {
+    private UserDto newUser = new UserDto();
+    private string password = "";
+
+    private async Task HandleValidSubmit()
+    {
+        var result = await UserService.CreateUserAsync(newUser, password);
+        if (result.Succeeded)
+        {
+            NavigationManager.NavigateTo("/admin/dashboard/users");
+        }
+        else
+        {
+            // Obsłuż błąd, np. wyświetl alert
+        }
+    }
+}

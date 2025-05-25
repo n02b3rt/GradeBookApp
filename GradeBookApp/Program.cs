@@ -1,3 +1,4 @@
+using GradeBookApp.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -6,6 +7,7 @@ using GradeBookApp.Components.Account;
 using GradeBookApp.Data;
 using GradeBookApp.Data.Entities;
 using GradeBookApp.Data.Seed;
+using GradeBookApp.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,6 +42,9 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddDefaultTokenProviders();
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+
+builder.Services.AddScoped<UserService>();
+
 
 var app = builder.Build();
 

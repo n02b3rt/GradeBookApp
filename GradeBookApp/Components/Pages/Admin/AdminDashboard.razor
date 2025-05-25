@@ -1,9 +1,19 @@
 ﻿@page "/admin/dashboard"
+@rendermode InteractiveServer
 @using Microsoft.AspNetCore.Authorization
 @attribute [Authorize(Roles = "Admin")]
 
 <h1>Admin Dashboard</h1>
 
-<p>Witaj, Administratorze! To jest panel administracyjny.</p>
+<p>@message</p>
 
-<!-- Dodaj tu więcej funkcji admina -->
+<button class="btn btn-primary" @onclick="OnClick">Kliknij mnie!</button>
+
+@code {
+    private string message = "Nie kliknięto";
+
+    private void OnClick()
+    {
+        message = "Kliknięto!";
+    }
+}

@@ -1,0 +1,68 @@
+﻿@page "/admin/dashboard/users/edit/{UserId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+<h3>Edytuj użytkownika</h3>
+
+@if (user == null)
+{
+    <p>Ładowanie...</p>
+}
+else
+{
+    <EditForm Model="user" OnValidSubmit="HandleValidSubmit">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div>
+            <label>Username:</label>
+            <InputText @bind-Value="user.UserName" />
+        </div>
+        <div>
+            <label>Email:</label>
+            <InputText @bind-Value="user.Email" />
+        </div>
+        <div>
+            <label>Imię:</label>
+            <InputText @bind-Value="user.FirstName" />
+        </div>
+        <div>
+            <label>Nazwisko:</label>
+            <InputText @bind-Value="user.LastName" />
+        </div>
+
+        <button type="submit">Zapisz zmiany</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = null!;
+
+    private UserDto? user;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Pobierz użytkownika po ID (dopasuj metodę z UserService)
+        user = await UserService.GetUserByIdAsync(UserId);
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (user == null) return;
+
+        var result = await UserService.UpdateUserAsync(UserId, user);
+
+        if (result.Succeeded)
+        {
+            NavigationManager.NavigateTo("/admin/dashboard/users");
+        }
+        else
+        {
+            // Tutaj obsłuż błędy, np. pokaż alert lub komunikaty walidacji
+        }
+    }
+}
