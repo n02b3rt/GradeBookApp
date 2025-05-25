@@ -1,0 +1,109 @@
+﻿@page "/admin/dashboard/classes/add"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<h3>Dodaj klasę</h3>
+
+<EditForm Model="newClass" OnValidSubmit="HandleValidSubmit" FormName="AddClassForm">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Nazwa</label>
+        <InputText class="form-control" @bind-Value="newClass.Name" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Rok</label>
+        <InputNumber class="form-control" @bind-Value="newClass.Year" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Wychowawca</label>
+        <select class="form-select" @bind="newClass.TeacherId">
+            <option value="">-- Wybierz wychowawcę --</option>
+            @if (teachers != null)
+            {
+                @foreach (var t in teachers)
+                {
+                    <option value="@t.Id">@t.FirstName @t.LastName (@t.Email)</option>
+                }
+            }
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Dodaj</button>
+    <button type="button" class="btn btn-secondary ms-2" @onclick="Cancel">Anuluj</button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info mt-3">@message</div>
+}
+
+@code {
+    private ClassAddModel newClass = new();
+    private string? message;
+    private List<TeacherDto>? teachers;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/teachers");
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas pobierania nauczycieli: {ex.Message}";
+        }
+    }
+
+    async Task HandleValidSubmit()
+    {
+        message = null;
+        try
+        {
+            var resp = await Http.PostAsJsonAsync("api/classes", newClass);
+            if (resp.IsSuccessStatusCode)
+            {
+                NavigateToList();
+            }
+            else
+            {
+                // Pobierz komunikat z odpowiedzi (jeśli jest)
+                var errorContent = await resp.Content.ReadAsStringAsync();
+                message = $"Błąd podczas dodawania klasy: {errorContent}";
+            }
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas dodawania klasy: {ex.Message}";
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigateToList();
+    }
+
+    private void NavigateToList()
+    {
+        Navigation.NavigateTo("/admin/dashboard/classes");
+    }
+
+    public class ClassAddModel
+    {
+        public string Name { get; set; } = "";
+        public int Year { get; set; }
+        public string TeacherId { get; set; } = "";
+    }
+
+    public class TeacherDto
+    {
+        public string Id { get; set; } = "";
+        public string FirstName { get; set; } = "";
+        public string LastName { get; set; } = "";
+        public string Email { get; set; } = "";
+    }
+}

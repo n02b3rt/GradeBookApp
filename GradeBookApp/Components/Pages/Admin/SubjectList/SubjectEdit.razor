@@ -1,0 +1,84 @@
+﻿@page "/admin/dashboard/subjects/add"
+@page "/admin/dashboard/subjects/edit/{SubjectId}"
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+
+<h3>@(IsNew ? "Dodaj przedmiot" : "Edytuj przedmiot")</h3>
+
+<EditForm Model="editSubject" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <label>Nazwa:</label>
+    <InputText @bind-Value="editSubject.Name" />
+
+    <label>Skrót:</label>
+    <InputText @bind-Value="editSubject.ShortName" />
+
+    <button type="submit">Zapisz</button>
+    <button type="button" @onclick="Cancel">Anuluj</button>
+</EditForm>
+
+@code {
+    [Parameter]
+    public string? SubjectId { get; set; }
+
+    private SubjectDto editSubject = new();
+    private bool IsNew => string.IsNullOrEmpty(SubjectId);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!IsNew)
+        {
+            var subject = await Http.GetFromJsonAsync<SubjectDto>($"api/subjects/{SubjectId}");
+            if (subject != null)
+            {
+                editSubject = subject;
+            }
+            else
+            {
+                // Obsłuż przypadek nie znalezienia
+                NavigationManager.NavigateTo("/admin/dashboard/subjects");
+            }
+        }
+        else
+        {
+            editSubject = new SubjectDto();
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        HttpResponseMessage resp;
+
+        if (IsNew)
+        {
+            resp = await Http.PostAsJsonAsync("api/subjects", editSubject);
+        }
+        else
+        {
+            resp = await Http.PutAsJsonAsync($"api/subjects/{SubjectId}", editSubject);
+        }
+
+        if (resp.IsSuccessStatusCode)
+        {
+            NavigationManager.NavigateTo("/admin/dashboard/subjects");
+        }
+        else
+        {
+            // Obsłuż błąd
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/admin/dashboard/subjects");
+    }
+
+    public class SubjectDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ShortName { get; set; } = "";
+    }
+}

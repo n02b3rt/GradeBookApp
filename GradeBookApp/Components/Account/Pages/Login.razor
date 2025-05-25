@@ -61,55 +61,48 @@
 
     public async Task LoginUser()
     {
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        // Najpierw szukasz użytkownika po Email
+        var user = await UserManager.FindByEmailAsync(Input.Email);
+        if (user == null)
+        {
+            errorMessage = "Nieprawidłowa próba logowania.";
+            return;
+        }
+
+        // Teraz wywołujesz logowanie podając UserName użytkownika
+        var result = await SignInManager.PasswordSignInAsync(user.UserName, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
 
-            var user = await UserManager.FindByEmailAsync(Input.Email);
-            if (user != null)
-            {
-                var roles = await UserManager.GetRolesAsync(user);
+            var roles = await UserManager.GetRolesAsync(user);
 
-                // Przekierowanie wg ról
-                if (roles.Contains("Admin"))
-                {
-                    NavigationManager.NavigateTo("/admin/dashboard");
-                }
-                else if (roles.Contains("Teacher"))
-                {
-                    NavigationManager.NavigateTo("/teacher/dashboard");
-                }
-                else if (roles.Contains("Student"))
-                {
-                    NavigationManager.NavigateTo("/student/dashboard");
-                }
-                else
-                {
-                    // Domyślne przekierowanie jeśli brak roli
-                    NavigationManager.NavigateTo("/");
-                }
-            }
+            // Przekierowanie wg ról
+            if (roles.Contains("Admin"))
+                NavigationManager.NavigateTo("/admin/dashboard");
+            else if (roles.Contains("Teacher"))
+                NavigationManager.NavigateTo("/teacher/dashboard");
+            else if (roles.Contains("Student"))
+                NavigationManager.NavigateTo("/student/dashboard");
             else
-            {
                 NavigationManager.NavigateTo("/");
-            }
         }
         else if (result.RequiresTwoFactor)
         {
-            // Jeśli nie używasz 2FA, ten blok możesz usunąć
-            errorMessage = "Two-factor authentication is required, but currently not supported.";
+            errorMessage = "Two-factor authentication jest wymagana, ale nie jest obsługiwana.";
         }
         else if (result.IsLockedOut)
         {
-            Logger.LogWarning("User account locked out.");
-            errorMessage = "User account is locked out.";
+            Logger.LogWarning("Konto użytkownika zostało zablokowane.");
+            errorMessage = "Konto użytkownika jest zablokowane.";
         }
         else
         {
-            errorMessage = "Error: Invalid login attempt.";
+            errorMessage = "Nieprawidłowa próba logowania.";
         }
     }
+
 
     private sealed class InputModel
     {

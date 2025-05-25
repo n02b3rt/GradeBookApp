@@ -14,7 +14,4 @@ public class Class
     // Relacja do wychowawcy klasy
     public string TeacherId { get; set; } = string.Empty;
     public ApplicationUser Teacher { get; set; } = null!;
-
-    // Lista uczniów przypisanych do klasy
-    public ICollection<ApplicationUser> Students { get; set; } = new List<ApplicationUser>();
 }

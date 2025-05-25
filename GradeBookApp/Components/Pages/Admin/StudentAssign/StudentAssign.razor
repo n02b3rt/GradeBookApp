@@ -1,0 +1,157 @@
+﻿@page "/admin/dashboard/student-assign/{ClassId:int}"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<h3>Przypisywanie uczniów do klasy</h3>
+
+@if (isLoading)
+{
+    <p>Ładowanie danych...</p>
+}
+else if (loadError)
+{
+    <div class="alert alert-danger" role="alert">
+        Błąd podczas ładowania danych.
+    </div>
+}
+else
+{
+    <h4>Klasa: @className</h4>
+
+    <div class="row">
+        <div class="col-md-6">
+            <h5>Uczniowie przypisani</h5>
+            @if (assignedStudents.Count == 0)
+            {
+                <p>Brak przypisanych uczniów.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var student in assignedStudents)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            @student.UserName
+                            <button class="btn btn-sm btn-danger" @onclick="() => RemoveStudent(student.Id)">Usuń</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+
+        <div class="col-md-6">
+            <h5>Uczniowie dostępni do dodania</h5>
+            @if (availableStudents.Count == 0)
+            {
+                <p>Brak dostępnych uczniów do dodania.</p>
+            }
+            else
+            {
+                <ul class="list-group">
+                    @foreach (var student in availableStudents)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            @student.UserName
+                            <button class="btn btn-sm btn-success" @onclick="() => AddStudent(student.Id)">Dodaj</button>
+                        </li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    <button class="btn btn-secondary mt-3" @onclick="GoBack">Powrót do listy klas</button>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-info mt-3" role="alert">@message</div>
+    }
+}
+
+@code {
+    [Parameter]
+    public int ClassId { get; set; }
+
+    private string className = "";
+    private List<UserDto> assignedStudents = new();
+    private List<UserDto> availableStudents = new();
+
+    private bool isLoading = true;
+    private bool loadError = false;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            await LoadData();
+        }
+        catch
+        {
+            loadError = true;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadData()
+    {
+        var cls = await Http.GetFromJsonAsync<ClassDto>($"api/classes/{ClassId}")
+            ?? throw new Exception("Klasa nie znaleziona");
+
+        className = cls.Name;
+
+        assignedStudents = await Http.GetFromJsonAsync<List<UserDto>>($"api/classes/{ClassId}/students") ?? new();
+        var allStudents = await Http.GetFromJsonAsync<List<UserDto>>("api/users/students") ?? new();
+
+        availableStudents = allStudents.Where(s => !assignedStudents.Any(a => a.Id == s.Id)).ToList();
+    }
+
+    private async Task AddStudent(string studentId)
+    {
+        var response = await Http.PostAsJsonAsync($"api/classes/{ClassId}/students", new { StudentId = studentId });
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Dodano ucznia.";
+            await LoadData();
+        }
+        else
+        {
+            message = "Błąd podczas dodawania ucznia.";
+        }
+    }
+
+    private async Task RemoveStudent(string studentId)
+    {
+        var response = await Http.DeleteAsync($"api/classes/{ClassId}/students/{studentId}");
+        if (response.IsSuccessStatusCode)
+        {
+            message = "Usunięto ucznia.";
+            await LoadData();
+        }
+        else
+        {
+            message = "Błąd podczas usuwania ucznia.";
+        }
+    }
+
+    private void GoBack()
+    {
+        Navigation.NavigateTo("/admin/dashboard/classes");
+    }
+
+    public class UserDto
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+    }
+
+    public class ClassDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+}

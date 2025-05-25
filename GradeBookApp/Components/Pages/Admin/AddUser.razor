@@ -4,51 +4,143 @@
 @using GradeBookApp.Shared
 @inject UserService UserService
 @inject NavigationManager NavigationManager
+@inject HttpClient Http
 
 <h3>Dodaj użytkownika</h3>
 
-<EditForm Model="newUser" OnValidSubmit="HandleValidSubmit">
+<EditForm Model="newUser" OnValidSubmit="HandleValidSubmit" FormName="AddUserForm">
     <DataAnnotationsValidator />
     <ValidationSummary />
 
-    <div>
+    <div class="mb-3">
         <label>Username:</label>
-        <InputText @bind-Value="newUser.UserName" />
-    </div>
-    <div>
-        <label>Email:</label>
-        <InputText @bind-Value="newUser.Email" />
-    </div>
-    <div>
-        <label>Imię:</label>
-        <InputText @bind-Value="newUser.FirstName" />
-    </div>
-    <div>
-        <label>Nazwisko:</label>
-        <InputText @bind-Value="newUser.LastName" />
-    </div>
-    <div>
-        <label>Hasło:</label>
-        <InputText @bind-Value="password" type="password" />
+        <InputText class="form-control" @bind-Value="newUser.UserName" />
     </div>
 
-    <button type="submit">Dodaj</button>
+    <div class="mb-3">
+        <label>Email:</label>
+        <InputText class="form-control" @bind-Value="newUser.Email" type="email" />
+    </div>
+
+    <div class="mb-3">
+        <label>Imię:</label>
+        <InputText class="form-control" @bind-Value="newUser.FirstName" />
+    </div>
+
+    <div class="mb-3">
+        <label>Nazwisko:</label>
+        <InputText class="form-control" @bind-Value="newUser.LastName" />
+    </div>
+
+    <div class="mb-3">
+        <label>Hasło:</label>
+        <InputText class="form-control" @bind-Value="password" type="password" />
+    </div>
+
+    <div class="mb-3">
+        <label>Data urodzenia:</label>
+        <InputDate class="form-control" @bind-Value="newUser.BirthDate" />
+    </div>
+
+    <div class="mb-3">
+        <label>Płeć:</label>
+        <InputText class="form-control" @bind-Value="newUser.Gender" />
+    </div>
+
+    <div class="mb-3">
+        <label>Adres:</label>
+        <InputText class="form-control" @bind-Value="newUser.Address" />
+    </div>
+
+    <div class="mb-3">
+        <label>PESEL:</label>
+        <InputText class="form-control" @bind-Value="newUser.PESEL" />
+    </div>
+
+    <div class="mb-3">
+        <label>Data rozpoczęcia nauki:</label>
+        <InputDate class="form-control" @bind-Value="newUser.EnrollmentDate" />
+    </div>
+
+    <div class="mb-3">
+        <label>Data zatrudnienia (jeśli nauczyciel):</label>
+        <InputDate class="form-control" @bind-Value="newUser.HireDate" />
+    </div>
+
+    <div class="mb-3">
+        <label>Przypisz do klasy:</label>
+        <select class="form-select" @bind="newUser.ClassId">
+            <option value="">-- Wybierz klasę --</option>
+            @if (classes != null)
+            {
+                @foreach (var c in classes)
+                {
+                    <option value="@c.Id">@c.Name (@c.Year)</option>
+                }
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label>Rola:</label>
+        <select class="form-select" @bind="selectedRole">
+            <option value="Student">Student</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Admin">Admin</option>
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Dodaj</button>
+    <button type="button" class="btn btn-secondary ms-2" @onclick="Cancel">Anuluj</button>
 </EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-danger mt-3">@message</div>
+}
 
 @code {
     private UserDto newUser = new UserDto();
     private string password = "";
+    private string? message;
+    private List<ClassDto>? classes;
+    private string selectedRole = "Student";
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes");
+        }
+        catch (Exception ex)
+        {
+            message = $"Błąd podczas pobierania listy klas: {ex.Message}";
+        }
+    }
 
     private async Task HandleValidSubmit()
     {
-        var result = await UserService.CreateUserAsync(newUser, password);
+        message = null;
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            message = "Hasło jest wymagane.";
+            return;
+        }
+
+        var result = await UserService.CreateUserAsync(newUser, password, selectedRole);
         if (result.Succeeded)
         {
             NavigationManager.NavigateTo("/admin/dashboard/users");
         }
         else
         {
-            // Obsłuż błąd, np. wyświetl alert
+            message = "Błąd podczas tworzenia użytkownika: " + string.Join(", ", result.Errors.Select(e => e.Description));
         }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/admin/dashboard/users");
     }
 }

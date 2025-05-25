@@ -1,0 +1,108 @@
+﻿@page "/admin/dashboard/subjects"
+@rendermode InteractiveServer
+
+@inject HttpClient Http
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<h3>Lista przedmiotów</h3>
+
+<button @onclick="GoToAddSubject" class="btn btn-primary mb-3">Dodaj przedmiot</button>
+
+@if (subjects == null)
+{
+    <p>Ładowanie...</p>
+}
+else if (subjects.Count == 0)
+{
+    <p>Brak przedmiotów</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Nazwa</th>
+                <th>Skrót</th>
+                <th>Akcje</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var s in subjects)
+            {
+                <tr>
+                    <td>@s.Name</td>
+                    <td>@s.ShortName</td>
+                    <td>
+                        <button @onclick="() => EditSubject(s.Id)" class="btn btn-sm btn-secondary">Edytuj</button>
+                        <button @onclick="() => DeleteSubject(s.Id)" class="btn btn-sm btn-danger">Usuń</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@if (showEditForm)
+{
+    <SubjectEdit SubjectId="selectedSubjectId" OnSaved="ReloadSubjects" OnCancel="HideEditForm" />
+}
+
+@code {
+    private List<SubjectDto>? subjects;
+    private bool showEditForm = false;
+    private string selectedSubjectId = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadSubjects();
+    }
+
+    async Task ReloadSubjects()
+    {
+        // Kluczowe: względny URL, HttpClient musi mieć BaseAddress ustawione
+        subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/subjects") ?? new List<SubjectDto>();
+        showEditForm = false;
+        StateHasChanged();
+    }
+
+    void GoToAddSubject()
+    {
+        selectedSubjectId = "";
+        showEditForm = true;
+    }
+
+    void EditSubject(string id)
+    {
+        selectedSubjectId = id;
+        showEditForm = true;
+    }
+
+    async Task DeleteSubject(string id)
+    {
+        var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Usunąć przedmiot?");
+        if (!confirmed) return;
+
+        var resp = await Http.DeleteAsync($"api/subjects/{id}");
+        if (resp.IsSuccessStatusCode)
+        {
+            await ReloadSubjects();
+        }
+        else
+        {
+            // Tutaj możesz dodać obsługę błędu np. alert
+        }
+    }
+
+    void HideEditForm()
+    {
+        showEditForm = false;
+    }
+
+    public class SubjectDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string ShortName { get; set; } = "";
+    }
+}

@@ -1,0 +1,120 @@
+﻿@page "/admin/dashboard/teacher-subjects"
+@rendermode InteractiveServer
+@inject HttpClient Http
+
+<h3>Przypisywanie nauczycieli do przedmiotów i klas</h3>
+
+<EditForm Model="assignment" OnValidSubmit="HandleValidSubmit" class="mb-3">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Nauczyciel:</label>
+        <select class="form-select" @bind="assignment.TeacherId">
+            <option value="">-- Wybierz nauczyciela --</option>
+            @foreach (var teacher in teachers)
+            {
+                <option value="@teacher.Id">@teacher.UserName</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Przedmiot:</label>
+        <select class="form-select" @bind="assignment.SubjectId">
+            <option value="">-- Wybierz przedmiot --</option>
+            @foreach (var subject in subjects)
+            {
+                <option value="@subject.Id">@subject.Name</option>
+            }
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Klasa:</label>
+        <select class="form-select" @bind="assignment.ClassId">
+            <option value="">-- Wybierz klasę --</option>
+            @foreach (var cls in classes)
+            {
+                <option value="@cls.Id">@cls.Name</option>
+            }
+        </select>
+    </div>
+
+    <button type="submit" class="btn btn-primary" disabled="@isSubmitting">
+        @(isSubmitting ? "Proszę czekać..." : "Przypisz")
+    </button>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(message))
+{
+    <div class="alert alert-info" role="alert">@message</div>
+}
+
+@code {
+    private List<UserDto> teachers = new();
+    private List<SubjectDto> subjects = new();
+    private List<ClassDto> classes = new();
+
+    private AssignmentModel assignment = new();
+
+    private bool isSubmitting = false;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        teachers = await Http.GetFromJsonAsync<List<UserDto>>("api/users/teachers") ?? new();
+        subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/subjects") ?? new();
+        classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes") ?? new();
+    }
+
+    async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrEmpty(assignment.TeacherId) || string.IsNullOrEmpty(assignment.SubjectId) || assignment.ClassId == 0)
+        {
+            message = "Wszystkie pola są wymagane.";
+            return;
+        }
+
+        isSubmitting = true;
+        message = null;
+
+        var resp = await Http.PostAsJsonAsync("api/teacher-subjects/assign", assignment);
+        if (resp.IsSuccessStatusCode)
+        {
+            message = "Przypisano nauczyciela.";
+            assignment = new AssignmentModel(); // reset form
+        }
+        else
+        {
+            message = "Błąd podczas przypisywania.";
+        }
+
+        isSubmitting = false;
+    }
+
+    public class UserDto
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+    }
+
+    public class SubjectDto
+    {
+        public string Id { get; set; } = "";
+        public string Name { get; set; } = "";
+    }
+
+    public class ClassDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    public class AssignmentModel
+    {
+        public string TeacherId { get; set; } = "";
+        public string SubjectId { get; set; } = "";
+        public int ClassId { get; set; }
+    }
+}

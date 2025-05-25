@@ -1,0 +1,92 @@
+﻿@page "/admin/dashboard/classes"
+@rendermode InteractiveServer
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<h3>Lista klas</h3>
+
+<button @onclick="ShowAddClass" class="btn btn-primary mb-3">Dodaj klasę</button>
+
+@if (classes == null)
+{
+    <p>Ładowanie...</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr><th>Nazwa</th><th>Rok</th><th>Wychowawca</th><th>Akcje</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var c in classes)
+            {
+                <tr>
+                    <td>@c.Name</td>
+                    <td>@c.Year</td>
+                    <td>@c.Teacher?.UserName</td>
+                    <td>
+                        <button @onclick="() => EditClass(c.Id)" class="btn btn-sm btn-secondary">Edytuj</button>
+                        <button @onclick="() => DeleteClass(c.Id)" class="btn btn-sm btn-danger">Usuń</button>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@inject IJSRuntime JsRuntime
+
+@code {
+    private List<ClassDto>? classes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadClasses();
+    }
+
+    private async Task ReloadClasses()
+    {
+        classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes");
+        StateHasChanged();
+    }
+
+    private void ShowAddClass()
+    {
+        Navigation.NavigateTo("/admin/dashboard/classes/add");
+    }
+
+    private void EditClass(int id)
+    {
+        Navigation.NavigateTo($"/admin/dashboard/classes/edit/{id}");
+    }
+
+    private async Task DeleteClass(int id)
+    {
+        var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Usunąć klasę?");
+        if (!confirmed) return;
+
+        var resp = await Http.DeleteAsync($"api/classes/{id}");
+        if (resp.IsSuccessStatusCode)
+        {
+            await ReloadClasses();
+        }
+        else
+        {
+            // Obsłuż błąd
+        }
+    }
+
+    public class ClassDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+        public int Year { get; set; }
+        public UserDto? Teacher { get; set; }
+    }
+
+    public class UserDto
+    {
+        public string Id { get; set; } = "";
+        public string UserName { get; set; } = "";
+    }
+}

@@ -20,7 +20,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     // === Relacja: Uczeń -> Klasa (wiele do jednego) ===
     builder.Entity<ApplicationUser>()
         .HasOne(u => u.Class)
-        .WithMany(c => c.Students)
+        .WithMany()
         .HasForeignKey(u => u.ClassId)
         .OnDelete(DeleteBehavior.SetNull);
 

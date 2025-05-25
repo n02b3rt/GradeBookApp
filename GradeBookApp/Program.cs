@@ -8,6 +8,7 @@ using GradeBookApp.Data;
 using GradeBookApp.Data.Entities;
 using GradeBookApp.Data.Seed;
 using GradeBookApp.Services;
+using Microsoft.AspNetCore.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,6 +16,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddControllers();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
@@ -43,8 +45,28 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+builder.Services.AddScoped<ClassService>();
+builder.Services.AddScoped<SubjectService>();
+builder.Services.AddScoped<TeacherSubjectService>();
+builder.Services.AddScoped<StudentClassService>();
 builder.Services.AddScoped<UserService>();
 
+// Dodaj usługi do kontenera
+builder.Services.AddRazorPages();
+builder.Services.AddServerSideBlazor();
+
+
+// Dodaj HttpClient (ważne!)
+builder.Services.AddHttpClient();
+
+builder.Services.AddScoped(sp =>
+{
+    var navigationManager = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient
+    {
+        BaseAddress = new Uri(navigationManager.BaseUri)
+    };
+});
 
 var app = builder.Build();
 
@@ -67,7 +89,7 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.MapAdditionalIdentityEndpoints(); // jeśli masz endpointy dla konta
-
+app.MapControllers(); 
 // === Seeder wywoływany przy starcie ===
 using (var scope = app.Services.CreateScope())
 {
