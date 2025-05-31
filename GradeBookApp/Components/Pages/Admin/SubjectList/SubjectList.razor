@@ -1,108 +1,111 @@
 ﻿@page "/admin/dashboard/subjects"
 @rendermode InteractiveServer
-
 @inject HttpClient Http
-@inject NavigationManager NavigationManager
+@inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 
-<h3>Lista przedmiotów</h3>
+@using GradeBookApp.Shared
 
-<button @onclick="GoToAddSubject" class="btn btn-primary mb-3">Dodaj przedmiot</button>
+<div class="container">
+    <h2 class="mb-4 fw-bold text-dark">📘 Lista przedmiotów</h2>
 
-@if (subjects == null)
-{
-    <p>Ładowanie...</p>
-}
-else if (subjects.Count == 0)
-{
-    <p>Brak przedmiotów</p>
-}
-else
-{
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Nazwa</th>
-                <th>Skrót</th>
-                <th>Akcje</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var s in subjects)
-            {
-                <tr>
-                    <td>@s.Name</td>
-                    <td>@s.ShortName</td>
-                    <td>
-                        <button @onclick="() => EditSubject(s.Id)" class="btn btn-sm btn-secondary">Edytuj</button>
-                        <button @onclick="() => DeleteSubject(s.Id)" class="btn btn-sm btn-danger">Usuń</button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <button @onclick="AddSubject" class="btn btn-primary fw-semibold">
+            ➕ Dodaj przedmiot
+        </button>
+    </div>
 
-@if (showEditForm)
-{
-    <SubjectEdit SubjectId="selectedSubjectId" OnSaved="ReloadSubjects" OnCancel="HideEditForm" />
-}
+    @if (subjects == null)
+    {
+        <div class="text-muted">⏳ Ładowanie przedmiotów...</div>
+    }
+    else if (subjects.Count == 0)
+    {
+        <div class="alert alert-info">Brak zarejestrowanych przedmiotów.</div>
+    }
+    else
+    {
+        <div class="table-responsive shadow-sm rounded">
+            <table class="table table-striped table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Nazwa</th>
+                        <th>Skrót</th>
+                        <th class="text-end">Akcje</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var subject in subjects)
+                    {
+                        <tr>
+                            <td>@subject.Name</td>
+                            <td>@subject.ShortName</td>
+                            <td class="text-end">
+                                <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditSubject(subject.Id)">
+                                    ✏️ Edytuj
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteSubject(subject.Id)">
+                                    🗑️ Usuń
+                                </button>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-info mt-3">@message</div>
+    }
+</div>
 
 @code {
     private List<SubjectDto>? subjects;
-    private bool showEditForm = false;
-    private string selectedSubjectId = "";
+    private string? message;
 
     protected override async Task OnInitializedAsync()
     {
-        await ReloadSubjects();
+        await LoadSubjects();
     }
 
-    async Task ReloadSubjects()
+    private async Task LoadSubjects()
     {
-        // Kluczowe: względny URL, HttpClient musi mieć BaseAddress ustawione
-        subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/subjects") ?? new List<SubjectDto>();
-        showEditForm = false;
-        StateHasChanged();
+        try
+        {
+            subjects = await Http.GetFromJsonAsync<List<SubjectDto>>("api/subjects");
+            message = null;
+        }
+        catch (Exception ex)
+        {
+            message = $"❗ Błąd ładowania: {ex.Message}";
+        }
     }
 
-    void GoToAddSubject()
+    private void AddSubject()
     {
-        selectedSubjectId = "";
-        showEditForm = true;
+        Navigation.NavigateTo("/admin/dashboard/subjects/add");
     }
 
-    void EditSubject(string id)
+    private void EditSubject(string id)
     {
-        selectedSubjectId = id;
-        showEditForm = true;
+        Navigation.NavigateTo($"/admin/dashboard/subjects/edit/{id}");
     }
 
-    async Task DeleteSubject(string id)
+    private async Task DeleteSubject(string id)
     {
-        var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Usunąć przedmiot?");
+        var confirmed = await JsRuntime.InvokeAsync<bool>("confirm", "Czy na pewno chcesz usunąć przedmiot?");
         if (!confirmed) return;
 
         var resp = await Http.DeleteAsync($"api/subjects/{id}");
         if (resp.IsSuccessStatusCode)
         {
-            await ReloadSubjects();
+            await LoadSubjects();
         }
         else
         {
-            // Tutaj możesz dodać obsługę błędu np. alert
+            message = "❗ Nie udało się usunąć przedmiotu.";
         }
-    }
-
-    void HideEditForm()
-    {
-        showEditForm = false;
-    }
-
-    public class SubjectDto
-    {
-        public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
-        public string ShortName { get; set; } = "";
     }
 }

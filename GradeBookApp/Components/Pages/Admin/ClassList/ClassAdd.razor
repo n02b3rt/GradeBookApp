@@ -3,65 +3,69 @@
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
-<h2 class="mb-4 fw-bold text-dark">➕ Dodaj nową klasę</h2>
+@using GradeBookApp.Shared
 
-<div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-        <EditForm Model="newClass" OnValidSubmit="HandleValidSubmit">
-            <DataAnnotationsValidator />
-            <ValidationSummary class="mb-3 text-danger" />
+<div class="container py-4">
+    <h2 class="mb-4 fw-bold text-dark">➕ Dodaj nową klasę</h2>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">📛 Nazwa klasy</label>
-                <InputText class="form-control" @bind-Value="newClass.Name" />
-            </div>
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <EditForm Model="newClass" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-3 text-danger" />
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">📅 Rok rozpoczęcia</label>
-                <InputNumber class="form-control" @bind-Value="newClass.Year" />
-            </div>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">📛 Nazwa klasy</label>
+                    <InputText class="form-control" @bind-Value="newClass.Name" />
+                </div>
 
-            <div class="mb-3">
-                <label class="form-label fw-semibold">👨‍🏫 Wychowawca</label>
-                <select class="form-select" @bind="newClass.TeacherId">
-                    <option value="">-- Wybierz wychowawcę --</option>
-                    @if (teachers != null)
-                    {
-                        @foreach (var t in teachers)
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">📅 Rok rozpoczęcia</label>
+                    <InputNumber class="form-control" @bind-Value="newClass.Year" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">👨‍🏫 Wychowawca</label>
+                    <select class="form-select" @bind="newClass.TeacherId">
+                        <option value="">-- Wybierz wychowawcę --</option>
+                        @if (teachers != null)
                         {
-                            <option value="@t.Id">@t.FirstName @t.LastName (@t.Email)</option>
+                            @foreach (var t in teachers)
+                            {
+                                <option value="@t.Id">@t.FullName (@t.Email)</option>
+                            }
                         }
-                    }
-                </select>
-            </div>
+                    </select>
+                </div>
 
-            <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-warning text-white fw-semibold me-2">
-                    💾 Dodaj
-                </button>
-                <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">
-                    ❌ Anuluj
-                </button>
-            </div>
-        </EditForm>
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-warning text-white fw-semibold me-2">
+                        💾 Zapisz
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">
+                        ❌ Anuluj
+                    </button>
+                </div>
+            </EditForm>
+        </div>
     </div>
-</div>
 
-@if (!string.IsNullOrEmpty(message))
-{
-    <div class="alert alert-info">@message</div>
-}
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-info">@message</div>
+    }
+</div>
 
 @code {
     private ClassAddModel newClass = new();
     private string? message;
-    private List<TeacherDto>? teachers;
+    private List<UserDto>? teachers;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            teachers = await Http.GetFromJsonAsync<List<TeacherDto>>("api/teachers");
+            teachers = await Http.GetFromJsonAsync<List<UserDto>>("api/teachers");
         }
         catch (Exception ex)
         {
@@ -87,7 +91,7 @@
         }
         catch (Exception ex)
         {
-            message = $"❗ Błąd podczas dodawania klasy: {ex.Message}";
+            message = $"❗ Wystąpił wyjątek: {ex.Message}";
         }
     }
 
@@ -103,16 +107,8 @@
 
     public class ClassAddModel
     {
-        public string Name { get; set; } = "";
+        public string Name { get; set; } = string.Empty;
         public int Year { get; set; }
-        public string TeacherId { get; set; } = "";
-    }
-
-    public class TeacherDto
-    {
-        public string Id { get; set; } = "";
-        public string FirstName { get; set; } = "";
-        public string LastName { get; set; } = "";
-        public string Email { get; set; } = "";
+        public string TeacherId { get; set; } = string.Empty;
     }
 }

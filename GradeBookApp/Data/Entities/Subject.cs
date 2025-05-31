@@ -1,7 +1,10 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Microsoft.EntityFrameworkCore;
 
 namespace GradeBookApp.Data.Entities;
 
+[Index(nameof(Name), IsUnique = true)]
+[Index(nameof(ShortName), IsUnique = true)]
 public class Subject
 {
     [Key]

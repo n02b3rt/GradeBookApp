@@ -7,11 +7,12 @@ public class Class
     public int Id { get; set; }
 
     [Required]
-    public string Name { get; set; } = string.Empty; // np. "4A", "5B"
+    public string Name { get; set; } = "";
 
-    public int Year { get; set; } // np. 2024
+    [Range(1900, 2100)]
+    public int Year { get; set; }
 
-    // Relacja do wychowawcy klasy
-    public string TeacherId { get; set; } = string.Empty;
+    [Required]
+    public string TeacherId { get; set; } = "";
     public ApplicationUser Teacher { get; set; } = null!;
 }

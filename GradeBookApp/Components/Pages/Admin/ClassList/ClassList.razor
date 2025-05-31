@@ -4,43 +4,56 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 
-<h2 class="mb-4 fw-bold text-dark">📚 Lista klas</h2>
+@using GradeBookApp.Shared
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <button @onclick="ShowAddClass" class="btn btn-warning text-white fw-semibold">
-        ➕ Dodaj klasę
-    </button>
-</div>
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold text-secondary">
+            📚 Lista klas
+        </h2>
+        <button @onclick="ShowAddClass" class="btn btn-warning text-white fw-semibold shadow-sm">
+            ➕ Dodaj klasę
+        </button>
+    </div>
 
-@if (classes == null)
-{
-    <div class="text-muted">Ładowanie danych klas...</div>
-}
-else if (classes.Count == 0)
-{
-    <div class="alert alert-info">Brak dostępnych klas.</div>
-}
-else
-{
-    <div class="table-responsive shadow-sm rounded">
-        <table class="table table-striped table-hover align-middle">
-            <thead class="table-light">
+    @if (classes == null)
+    {
+        <div class="text-muted">⏳ Ładowanie danych klas...</div>
+    }
+    else if (classes.Count == 0)
+    {
+        <div class="alert alert-info shadow-sm">Brak dostępnych klas.</div>
+    }
+    else
+    {
+        <div class="table-responsive shadow rounded">
+            <table class="table table-bordered table-hover align-middle">
+                <thead class="table-light">
                 <tr>
-                    <th>Nazwa</th>
-                    <th>Rok</th>
-                    <th>Wychowawca</th>
-                    <th class="text-end">Akcje</th>
+                    <th scope="col">📘 Nazwa</th>
+                    <th scope="col">📅 Rok</th>
+                    <th scope="col">👨‍🏫 Wychowawca</th>
+                    <th scope="col" class="text-end">⚙️ Akcje</th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 @foreach (var c in classes)
                 {
                     <tr>
                         <td>@c.Name</td>
                         <td>@c.Year</td>
-                        <td>@(string.IsNullOrEmpty(c.Teacher?.FirstName) ? "<i>brak</i>" : c.Teacher.UserName)</td>
+                        <td>
+                            @if (c.Teacher != null)
+                            {
+                                @c.Teacher.FullName
+                            }
+                            else
+                            {
+                                <span class="text-muted fst-italic">brak</span>
+                            }
+                        </td>
                         <td class="text-end">
-                            <button @onclick="() => EditClass(c.Id)" class="btn btn-sm btn-outline-secondary me-1">
+                            <button @onclick="() => EditClass(c.Id)" class="btn btn-sm btn-outline-primary me-2">
                                 ✏️ Edytuj
                             </button>
                             <button @onclick="() => DeleteClass(c.Id)" class="btn btn-sm btn-outline-danger">
@@ -49,10 +62,11 @@ else
                         </td>
                     </tr>
                 }
-            </tbody>
-        </table>
-    </div>
-}
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
 @code {
     private List<ClassDto>? classes;
@@ -65,7 +79,6 @@ else
     private async Task ReloadClasses()
     {
         classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes");
-        StateHasChanged();
     }
 
     private void ShowAddClass()
@@ -88,23 +101,5 @@ else
         {
             await ReloadClasses();
         }
-        else
-        {
-            // Można dodać np. toastr albo alert
-        }
-    }
-
-    public class ClassDto
-    {
-        public int Id { get; set; }
-        public string Name { get; set; } = "";
-        public int Year { get; set; }
-        public UserDto? Teacher { get; set; }
-    }
-
-    public class UserDto
-    {
-        public string Id { get; set; } = "";
-        public string UserName { get; set; } = "";
     }
 }

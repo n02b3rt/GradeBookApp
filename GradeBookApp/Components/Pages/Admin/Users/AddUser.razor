@@ -1,0 +1,195 @@
+﻿@page "/admin/dashboard/users/add"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+@inject HttpClient Http
+
+<div class="container">
+    <h2 class="mb-4 fw-bold text-dark">➕ Dodaj użytkownika</h2>
+
+    @if (!string.IsNullOrEmpty(message))
+    {
+        <div class="alert alert-info">@message</div>
+    }
+
+    <div class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <EditForm Model="newUser" OnValidSubmit="HandleValidSubmit">
+                <DataAnnotationsValidator />
+                <ValidationSummary class="mb-3 text-danger" />
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🧍 Imię</label>
+                        <InputText class="form-control" @bind-Value="newUser.FirstName" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🧍‍♂️ Nazwisko</label>
+                        <InputText class="form-control" @bind-Value="newUser.LastName" />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🗓️ Data urodzenia</label>
+                        <InputDate class="form-control" @bind-Value="newUser.BirthDate" />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">⚧️ Płeć</label>
+                        <select class="form-select" @bind="genderInput">
+                            <option value="K">Kobieta</option>
+                            <option value="M">Mężczyzna</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-12 mb-3">
+                        <label class="form-label fw-semibold">🏠 Adres</label>
+                        <InputText class="form-control" @bind-Value="newUser.Address" />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🆔 PESEL</label>
+                        <InputText class="form-control" @bind-Value="newUser.PESEL" />
+                    </div>
+
+                    <div class="col-12 mb-3">
+                        <div class="form-check">
+                            <InputCheckbox class="form-check-input"
+                                           @bind-Value="isTeacher" />
+                            <label class="form-check-label">👨‍🏫 Czy nauczyciel?</label>
+                        </div>
+                    </div>
+
+                    @if (isTeacher)
+                    {
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">📅 Data zatrudnienia</label>
+                            <InputDate class="form-control" @bind-Value="newUser.HireDate" />
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">📅 Data rozpoczęcia nauki</label>
+                            <InputDate class="form-control" @bind-Value="newUser.EnrollmentDate" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">🏷️ Przypisz do klasy</label>
+                            <select class="form-select" @bind="newUser.ClassId">
+                                <option value="">-- Wybierz klasę --</option>
+                                @foreach (var c in classes ?? Enumerable.Empty<ClassDto>())
+                                {
+                                    <option value="@c.Id">@c.Name (@c.Year)</option>
+                                }
+                            </select>
+                        </div>
+                    }
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🔒 Hasło</label>
+                        @if (isTeacher || selectedRole == "Admin")
+                        {
+                            <InputText class="form-control" @bind-Value="password" type="password" />
+                        }
+                        else
+                        {
+                            <input class="form-control" value="Szkoła123!" disabled />
+                        }
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🔑 Rola</label>
+                        <select class="form-select" @bind="selectedRole" disabled="@isTeacher">
+                            <option value="Student">Student</option>
+                            <option value="Teacher">Teacher</option>
+                            <option value="Admin">Admin</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-success fw-semibold me-2">💾 Dodaj</button>
+                    <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">❌ Anuluj</button>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+</div>
+
+@code {
+    private UserDto newUser = new();
+    private string password = "Szkoła123!";
+    private string? message;
+    private List<ClassDto>? classes;
+    private string genderInput = "K";
+    private bool isTeacher = false;
+
+    private string _selectedRole = "Student";
+    private string selectedRole
+    {
+        get => _selectedRole;
+        set
+        {
+            _selectedRole = value;
+            UpdateRole();
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes") ?? new();
+    }
+
+    private void UpdateRole()
+    {
+        if (_selectedRole == "Teacher")
+        {
+            isTeacher = true;
+            newUser.EnrollmentDate = null;
+            newUser.ClassId = null;
+            password = "";
+        }
+        else
+        {
+            isTeacher = false;
+            newUser.HireDate = null;
+            if (_selectedRole == "Student")
+                password = "Szkoła123!";
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        newUser.Gender = genderInput;
+        var finalRole = isTeacher ? "Teacher" : selectedRole;
+
+        if (!isTeacher && selectedRole == "Student")
+        {
+            password = "Szkoła123!";
+        }
+
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            message = "Hasło jest wymagane.";
+            return;
+        }
+
+        var result = await UserService.CreateUserAsync(newUser, password, finalRole);
+        if (result.Succeeded)
+        {
+            message = $"✅ Użytkownik dodany. Login: {newUser.UserName}, Email: {newUser.Email}";
+            NavigationManager.NavigateTo("/admin/dashboard/users");
+        }
+        else
+        {
+            message = "❗ Błąd podczas tworzenia: " + string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/admin/dashboard/users");
+    }
+}

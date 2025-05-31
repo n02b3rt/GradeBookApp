@@ -1,0 +1,135 @@
+﻿@page "/admin/dashboard/users/edit/{UserId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject UserService UserService
+@inject NavigationManager NavigationManager
+
+<div class="container">
+    <h2 class="mb-4 fw-bold text-dark">✏️ Edytuj użytkownika</h2>
+
+    @if (user == null)
+    {
+        <p>Ładowanie...</p>
+    }
+    else
+    {
+        <EditForm Model="user" OnValidSubmit="HandleValidSubmit">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="mb-3 text-danger" />
+
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">👤 Login</label>
+                            <InputText class="form-control" @bind-Value="user.UserName" disabled />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">📧 Email</label>
+                            <InputText class="form-control" @bind-Value="user.Email" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">🧍 Imię</label>
+                            <InputText class="form-control" @bind-Value="user.FirstName" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">🧍‍♂️ Nazwisko</label>
+                            <InputText class="form-control" @bind-Value="user.LastName" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">🗓️ Data urodzenia</label>
+                            <InputDate class="form-control" @bind-Value="user.BirthDate" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">⚧️ Płeć</label>
+                            <select class="form-select" @bind="user.Gender">
+                                <option value="K">Kobieta</option>
+                                <option value="M">Mężczyzna</option>
+                            </select>
+                        </div>
+
+                        <div class="col-md-12 mb-3">
+                            <label class="form-label fw-semibold">🏠 Adres</label>
+                            <InputText class="form-control" @bind-Value="user.Address" />
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-semibold">🆔 PESEL</label>
+                            <InputText class="form-control" @bind-Value="user.PESEL" />
+                        </div>
+
+                        @if (user.HireDate != null)
+                        {
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">📅 Data zatrudnienia</label>
+                                <InputDate class="form-control" @bind-Value="user.HireDate" />
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">📅 Data rozpoczęcia nauki</label>
+                                <InputDate class="form-control" @bind-Value="user.EnrollmentDate" />
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-semibold">🏷️ Klasa</label>
+                                <select class="form-select" @bind="user.ClassId">
+                                    <option value="">-- Wybierz klasę --</option>
+                                    @foreach (var c in classes ?? Enumerable.Empty<ClassDto>())
+                                    {
+                                        <option value="@c.Id">@c.Name (@c.Year)</option>
+                                    }
+                                </select>
+                            </div>
+                        }
+
+                        <div class="col-md-12 d-flex justify-content-end">
+                            <button type="submit" class="btn btn-success fw-semibold me-2">💾 Zapisz zmiany</button>
+                            <button type="button" class="btn btn-outline-secondary" @onclick="Cancel">❌ Anuluj</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </EditForm>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public string UserId { get; set; } = null!;
+
+    private UserDto? user;
+    private List<ClassDto>? classes;
+    private string? message;
+
+    protected override async Task OnInitializedAsync()
+    {
+        user = await UserService.GetUserByIdAsync(UserId);
+        classes = await UserService.GetClassesAsync(); // lub z Http.GetFromJsonAsync jeśli masz endpoint
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (user == null) return;
+
+        var result = await UserService.UpdateUserAsync(UserId, user);
+        if (result.Succeeded)
+        {
+            NavigationManager.NavigateTo("/admin/dashboard/users");
+        }
+        else
+        {
+            message = "❗ Błąd zapisu: " + string.Join(", ", result.Errors.Select(e => e.Description));
+        }
+    }
+
+    private void Cancel()
+    {
+        NavigationManager.NavigateTo("/admin/dashboard/users");
+    }
+}

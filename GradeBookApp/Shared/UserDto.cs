@@ -16,5 +16,6 @@
         public int? ClassId { get; set; }
         
         public List<string> Roles { get; set; } = new();  // <-- Dodane
+        public string FullName => $"{FirstName} {LastName}";
     }
 }

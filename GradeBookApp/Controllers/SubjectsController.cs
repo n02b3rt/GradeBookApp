@@ -1,69 +1,79 @@
-﻿using GradeBookApp.Data;
-using GradeBookApp.Data.Entities;
+﻿using GradeBookApp.Services;
+using GradeBookApp.Shared;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
-namespace GradeBookApp.Controllers
+namespace GradeBookApp.Controllers;
+
+[ApiController]
+[Route("api/subjects")]
+public class SubjectsController : ControllerBase
 {
-    [ApiController]
-    [Route("api/subjects")]  // Możesz na sztywno ustawić endpoint
-    public class SubjectsController : ControllerBase
+    private readonly SubjectService _subjectService;
+
+    public SubjectsController(SubjectService subjectService)
     {
-        private readonly ApplicationDbContext _context;
+        _subjectService = subjectService;
+    }
 
-        public SubjectsController(ApplicationDbContext context)
+    [HttpGet]
+    public async Task<ActionResult<List<SubjectDto>>> GetAll()
+    {
+        var subjects = await _subjectService.GetSubjectsAsync();
+        return Ok(subjects);
+    }
+
+    [HttpGet("{id}")]
+    public async Task<ActionResult<SubjectDto>> GetById(string id)
+    {
+        var subject = await _subjectService.GetSubjectByIdAsync(id);
+        if (subject == null) return NotFound();
+        return Ok(subject);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<SubjectDto>> Create([FromBody] SubjectDto dto)
+    {
+        try
         {
-            _context = context;
+            var created = await _subjectService.CreateSubjectAsync(dto);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
         }
-
-        [HttpGet]
-        public async Task<ActionResult<List<Subject>>> GetSubjects()
+        catch (ArgumentException ex)
         {
-            var subjects = await _context.Subjects.ToListAsync();
-            return Ok(subjects);
+            return BadRequest($"❗ {ex.Message}");
         }
-
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Subject?>> GetSubject(string id)
+        catch (DbUpdateException dbEx)
         {
-            var subject = await _context.Subjects.FindAsync(id);
-            if (subject == null) return NotFound();
-            return Ok(subject);
+            return BadRequest("❗ Wystąpił błąd bazy danych – być może przedmiot już istnieje.");
         }
+    }
 
-        [HttpPost]
-        public async Task<ActionResult<Subject>> CreateSubject(Subject newSubject)
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(string id, [FromBody] SubjectDto dto)
+    {
+        if (id != dto.Id) return BadRequest("ID nie zgadza się z obiektem.");
+
+        try
         {
-            _context.Subjects.Add(newSubject);
-            await _context.SaveChangesAsync();
-            return CreatedAtAction(nameof(GetSubject), new { id = newSubject.Id }, newSubject);
-        }
+            var updated = await _subjectService.UpdateSubjectAsync(dto);
+            if (!updated) return NotFound();
 
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateSubject(string id, Subject updatedSubject)
-        {
-            if (id != updatedSubject.Id) return BadRequest("Id mismatch");
-
-            var existing = await _context.Subjects.FindAsync(id);
-            if (existing == null) return NotFound();
-
-            existing.Name = updatedSubject.Name;
-            existing.ShortName = updatedSubject.ShortName;
-            // ... inne pola
-
-            await _context.SaveChangesAsync();
             return NoContent();
         }
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteSubject(string id)
+        catch (ArgumentException ex)
         {
-            var subject = await _context.Subjects.FindAsync(id);
-            if (subject == null) return NotFound();
-
-            _context.Subjects.Remove(subject);
-            await _context.SaveChangesAsync();
-            return NoContent();
+            return BadRequest($"❗ {ex.Message}");
         }
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(string id)
+    {
+        var deleted = await _subjectService.DeleteSubjectAsync(id);
+        if (!deleted) return NotFound();
+
+        return NoContent();
     }
 }

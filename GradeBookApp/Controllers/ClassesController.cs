@@ -66,5 +66,13 @@ namespace GradeBookApp.Controllers
 
             return NoContent();
         }
+        
+        [HttpGet("simple")]
+        public async Task<ActionResult<List<object>>> GetSimple()
+        {
+            var classes = await _classService.GetClassesAsync();
+            return Ok(classes.Select(c => new { c.Id, c.Name }));
+        }
+
     }
 }
