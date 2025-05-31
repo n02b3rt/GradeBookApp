@@ -1,4 +1,6 @@
 ﻿@inherits LayoutComponentBase
+@using GradeBookApp.Components.Layout
+
 
 <head>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
@@ -6,11 +8,9 @@
 </head>
 
 <body>
-<header>
-    <!-- Twój header -->
-</header>
+<Header></Header>
 
-<main class="container mt-3 d-flex justify-content-center align-items-center">
+<main class="container mt-3 d-flex flex-row justify-content-center align-items-center">
     @Body
 </main>
 

@@ -2,39 +2,57 @@
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
 
-<h3>Lista klas</h3>
+<h2 class="mb-4 fw-bold text-dark">📚 Lista klas</h2>
 
-<button @onclick="ShowAddClass" class="btn btn-primary mb-3">Dodaj klasę</button>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <button @onclick="ShowAddClass" class="btn btn-warning text-white fw-semibold">
+        ➕ Dodaj klasę
+    </button>
+</div>
 
 @if (classes == null)
 {
-    <p>Ładowanie...</p>
+    <div class="text-muted">Ładowanie danych klas...</div>
+}
+else if (classes.Count == 0)
+{
+    <div class="alert alert-info">Brak dostępnych klas.</div>
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr><th>Nazwa</th><th>Rok</th><th>Wychowawca</th><th>Akcje</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var c in classes)
-            {
+    <div class="table-responsive shadow-sm rounded">
+        <table class="table table-striped table-hover align-middle">
+            <thead class="table-light">
                 <tr>
-                    <td>@c.Name</td>
-                    <td>@c.Year</td>
-                    <td>@c.Teacher?.UserName</td>
-                    <td>
-                        <button @onclick="() => EditClass(c.Id)" class="btn btn-sm btn-secondary">Edytuj</button>
-                        <button @onclick="() => DeleteClass(c.Id)" class="btn btn-sm btn-danger">Usuń</button>
-                    </td>
+                    <th>Nazwa</th>
+                    <th>Rok</th>
+                    <th>Wychowawca</th>
+                    <th class="text-end">Akcje</th>
                 </tr>
-            }
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                @foreach (var c in classes)
+                {
+                    <tr>
+                        <td>@c.Name</td>
+                        <td>@c.Year</td>
+                        <td>@(string.IsNullOrEmpty(c.Teacher?.FirstName) ? "<i>brak</i>" : c.Teacher.UserName)</td>
+                        <td class="text-end">
+                            <button @onclick="() => EditClass(c.Id)" class="btn btn-sm btn-outline-secondary me-1">
+                                ✏️ Edytuj
+                            </button>
+                            <button @onclick="() => DeleteClass(c.Id)" class="btn btn-sm btn-outline-danger">
+                                🗑️ Usuń
+                            </button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
 }
-
-@inject IJSRuntime JsRuntime
 
 @code {
     private List<ClassDto>? classes;
@@ -72,7 +90,7 @@ else
         }
         else
         {
-            // Obsłuż błąd
+            // Można dodać np. toastr albo alert
         }
     }
 
