@@ -72,6 +72,7 @@ builder.Services.AddScoped<TeacherSubjectService>();
 builder.Services.AddScoped<StudentClassService>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<StudentDataService>();
+builder.Services.AddScoped<TeacherActionsService>();
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 builder.Services.AddRazorComponents()

@@ -1,0 +1,108 @@
+﻿@page "/teacher/class/{ClassId:int}/students"
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="container mt-4">
+    <h2 class="mb-3" style="color: #f39c12;">
+        <i class="bi bi-people-fill"></i> Students in Class <strong>@ClassName</strong>
+    </h2>
+
+    @if (loading)
+    {
+        <div class="alert alert-info">Loading students and grades...</div>
+    }
+    else if (students == null || !students.Any())
+    {
+        <div class="alert alert-warning">No students found.</div>
+    }
+    else
+    {
+        <table class="table table-bordered table-striped">
+            <thead style="background-color: #f39c12; color: white;">
+                <tr>
+                    <th>#</th>
+                    <th>Full Name</th>
+                    <th>Grades</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (student, index) in students.Select((s, i) => (s, i + 1)))
+                {
+                    <tr>
+                        <td>@index</td>
+                        <td>@student.FirstName @student.LastName</td>
+                        <td>
+                            @if (gradesByStudent.TryGetValue(student.Id, out var grades) && grades.Any())
+                            {
+                                @foreach (var grade in grades)
+                                {
+                                    <span class="badge rounded-pill text-white me-1 mb-1"
+                                          style="background-color: #f39c12;"
+                                          title="@($"Value: {grade.Value}, Weight: {grade.Weight}, Desc: {grade.Description}, Date: {grade.DateGiven:yyyy-MM-dd}")">
+                                        @grade.Value
+                                    </span>
+                                }
+                            }
+                            else
+                            {
+                                <span class="text-muted">No grades</span>
+                            }
+                        </td>
+                        <td>
+                            <a class="btn btn-sm btn-success"
+                               href="/teacher/grades/add/@student.Id/@SubjectId">
+                                <i class="bi bi-plus-circle"></i> Add Grade
+                            </a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    [Parameter] public int ClassId { get; set; }
+
+    private List<UserDto>? students;
+    private Dictionary<string, List<GradeDto>> gradesByStudent = new();
+    private string? SubjectId;
+    private string ClassName = "";
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        var teacherId = user.FindFirst("sub")?.Value ??
+                        user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        if (string.IsNullOrEmpty(teacherId)) return;
+
+        students = await TeacherService.GetStudentsInClassAsync(ClassId);
+
+        // Pobierz przypisany do tej klasy przedmiot nauczyciela
+        var ts = (await TeacherService.GetTeacherSubjectsAsync(teacherId))
+                    .FirstOrDefault(t => t.ClassId == ClassId);
+
+        if (ts is null)
+        {
+            loading = false;
+            return;
+        }
+
+        SubjectId = ts.SubjectId;
+
+        var classList = await TeacherService.GetClassesForTeacherAsync(teacherId);
+        ClassName = classList.FirstOrDefault(c => c.Id == ClassId)?.Name ?? $"#{ClassId}";
+
+        gradesByStudent = await TeacherService
+            .GetGradesForClassAndSubjectByTeacherAsync(ClassId, SubjectId, teacherId);
+
+        loading = false;
+    }
+}

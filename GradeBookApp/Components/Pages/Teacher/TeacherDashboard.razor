@@ -1,9 +1,80 @@
 ﻿@page "/teacher/dashboard"
+@using GradeBookApp.Services
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject AuthenticationStateProvider AuthStateProvider
 @attribute [Authorize(Roles = "Teacher")]
 
-<h1>Teacher Dashboard</h1>
+<div class="container mt-4">
+    <h1 class="mb-3" style="color: #f39c12;">
+        <i class="bi bi-person-lines-fill"></i> Teacher Dashboard
+    </h1>
+    <p class="lead">Welcome, Teacher! Below are your assigned classes.</p>
 
-<p>Witaj, Nauczycielu! To jest Twój panel nauczycielski.</p>
+    @if (loading)
+    {
+        <div class="alert alert-info">Loading your classes...</div>
+    }
+    else if (classes is null || !classes.Any())
+    {
+        <div class="alert alert-warning">You are not assigned to any classes.</div>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-bordered border-warning">
+                <thead style="background-color: #f39c12; color: white;">
+                    <tr>
+                        <th>#</th>
+                        <th>Class Name</th>
+                        <th>Year</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cls in classes.Select((c, i) => new { Class = c, Index = i + 1 }))
+                    {
+                        <tr>
+                            <td>@cls.Index</td>
+                            <td>@cls.Class.Name</td>
+                            <td>@cls.Class.Year</td>
+                            <td>
+                                <a class="btn btn-sm text-white" style="background-color: #f39c12;" 
+                                   href="/teacher/class/@cls.Class.Id/students">
+                                    <i class="bi bi-eye-fill"></i> View Class
+                                </a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+</div>
 
-<!-- Dodaj tutaj dodatkowe funkcjonalności nauczyciela -->
+@code {
+    private List<ClassDto>? classes;
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var teacherId =
+                user.FindFirst("sub")?.Value ??
+                user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+            if (!string.IsNullOrEmpty(teacherId))
+            {
+                classes = await TeacherService.GetClassesForTeacherAsync(teacherId);
+            }
+        }
+
+        loading = false;
+    }
+}
