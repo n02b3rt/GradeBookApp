@@ -1,7 +1,3 @@
-using GradeBookApp.Services;
-using Microsoft.AspNetCore.Components.Authorization;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using GradeBookApp.Components;
 using GradeBookApp.Components.Account;
 using GradeBookApp.Data;
@@ -9,33 +5,51 @@ using GradeBookApp.Data.Entities;
 using GradeBookApp.Data.Seed;
 using GradeBookApp.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// === Services ===
-builder.Services.AddRazorComponents()
-    .AddInteractiveServerComponents();
+// === 0. Konfiguracja plików JSON + środowiskowego
+builder.Configuration
+    .SetBasePath(builder.Environment.ContentRootPath)
+    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables();
 
-builder.Services.AddControllers();
-builder.Services.AddCascadingAuthenticationState();
-builder.Services.AddScoped<IdentityUserAccessor>();
-builder.Services.AddScoped<IdentityRedirectManager>();
-builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+// === 1. Rejestracja sekcji DatabaseSettings
+builder.Services.Configure<DatabaseSettings>(
+    builder.Configuration.GetSection("DatabaseSettings"));
 
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-                       ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+// === 2. Fabryka DbContext
+builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, options) =>
+{
+    var monitor = sp.GetRequiredService<IOptionsMonitor<DatabaseSettings>>();
+    bool useBackup = monitor.CurrentValue.UseBackup;
+    Console.WriteLine($"[DbContextFactory BEFORE] UseBackup = {useBackup}");
 
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    var config = sp.GetRequiredService<IConfiguration>();
+    string connString = useBackup
+        ? config.GetConnectionString("Backup")
+        : config.GetConnectionString("Primary");
 
-builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+    Console.WriteLine($"[DbContextFactory] Łączę się z bazą: {(useBackup ? "Backup" : "Primary")} ({connString})");
+    options.UseNpgsql(connString);
+});
 
-// ** Jednorazowa konfiguracja Identity przed builder.Build() **
+// === 3. ApplicationDbContext tylko przez fabrykę
+builder.Services.AddScoped<ApplicationDbContext>(sp =>
+    sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
+
+// === 4. Identity
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.SignIn.RequireConfirmedAccount = false;       // Jeśli chcesz wyłączyć potwierdzenie maila
-    options.Lockout.AllowedForNewUsers = false;            // Wyłącz blokadę konta
-    options.Tokens.AuthenticatorTokenProvider = null;      // Wyłącz 2FA
+    options.SignIn.RequireConfirmedAccount = false;
+    options.Lockout.AllowedForNewUsers = false;
+    options.Tokens.AuthenticatorTokenProvider = null;
     options.Password.RequireNonAlphanumeric = false;
     options.Password.RequireUppercase = false;
     options.Password.RequireDigit = false;
@@ -43,34 +57,33 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
-
+// === 5. Twoje serwisy
 builder.Services.AddScoped<ClassService>();
 builder.Services.AddScoped<SubjectService>();
 builder.Services.AddScoped<TeacherSubjectService>();
 builder.Services.AddScoped<StudentClassService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
-// Dodaj usługi do kontenera
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
+builder.Services.AddControllers();
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<IdentityUserAccessor>();
+builder.Services.AddScoped<IdentityRedirectManager>();
+builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-
-
-// Dodaj HttpClient (ważne!)
 builder.Services.AddHttpClient();
-
 builder.Services.AddScoped(sp =>
 {
-    var navigationManager = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient
-    {
-        BaseAddress = new Uri(navigationManager.BaseUri)
-    };
+    var nav = sp.GetRequiredService<NavigationManager>();
+    return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
 });
 
 var app = builder.Build();
 
-// === Middleware pipeline ===
+// === 6. Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -83,40 +96,42 @@ else
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+// Map kontrolerów przed Blazor:
+app.MapControllers();
 
-app.MapAdditionalIdentityEndpoints(); // jeśli masz endpointy dla konta
-app.MapControllers(); 
-// === Seeder wywoływany przy starcie ===
+app.MapRazorComponents<App>()
+   .AddInteractiveServerRenderMode();
+app.MapAdditionalIdentityEndpoints();
+
+// === 7. Migracje + seedy – BEZWZGLĘDNIE ZA KAŻDYM RAZEM, ale bez usuwania bazy ===
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
-    var dbContext = services.GetRequiredService<ApplicationDbContext>();
-    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
-    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    var ctxFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+    await using var dbContext = ctxFactory.CreateDbContext();
 
-    // Jeśli chcesz to robić tylko w Development:
-    if (app.Environment.IsDevelopment())
-    {
-        // 1. Usuń obecną bazę
-        await dbContext.Database.EnsureDeletedAsync();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
-        // 2. Utwórz ją od nowa na podstawie migracji
-        await dbContext.Database.MigrateAsync();
+    Console.WriteLine("[Program] Migrate (UNCONDITIONAL)");
+    // * Zakomentowane usuwanie bazy:
+    // Console.WriteLine("[Program] EnsureDeleted (UNCONDITIONAL)");
+    // await dbContext.Database.EnsureDeletedAsync();
+    await dbContext.Database.MigrateAsync();
 
-        // 3. Uruchom seeder, żeby zasypać świeżo stworzonymi danymi
-        await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
-    }
-    else
-    {
-        // W środowisku produkcyjnym lub testowym
-        // możesz po prostu wgrać brakujące migracje i _nie_ usuwać wszystkiego:
-        await dbContext.Database.MigrateAsync();
-        await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
-    }
+    Console.WriteLine("[Program] DbSeeder.SeedAsync (UNCONDITIONAL) start");
+    await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
+    Console.WriteLine("[Program] DbSeeder.SeedAsync (UNCONDITIONAL) end");
 }
 
+Console.WriteLine("[Program] Uruchamiam aplikację");
 app.Run();
+
+public class DatabaseSettings
+{
+    public bool UseBackup { get; set; }
+}

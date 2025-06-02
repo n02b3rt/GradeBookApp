@@ -3,104 +3,104 @@ using GradeBookApp.Data.Entities;
 using GradeBookApp.Shared;
 using Microsoft.EntityFrameworkCore;
 
-namespace GradeBookApp.Services
+namespace GradeBookApp.Services;
+
+public class SubjectService
 {
-    public class SubjectService
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+
+    public SubjectService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        private readonly ApplicationDbContext _context;
+        _contextFactory = contextFactory;
+    }
 
-        public SubjectService(ApplicationDbContext context)
-        {
-            _context = context;
-        }
-
-        public async Task<List<SubjectDto>> GetSubjectsAsync()
-        {
-            return await _context.Subjects
-                .Select(s => new SubjectDto
-                {
-                    Id = s.Id,
-                    Name = s.Name,
-                    ShortName = s.ShortName
-                })
-                .ToListAsync();
-        }
-
-        public async Task<SubjectDto?> GetSubjectByIdAsync(string id)
-        {
-            var s = await _context.Subjects.FindAsync(id);
-            if (s == null) return null;
-
-            return new SubjectDto
+    public async Task<List<SubjectDto>> GetSubjectsAsync()
+    {
+        using var context = _contextFactory.CreateDbContext();
+        return await context.Subjects
+            .Select(s => new SubjectDto
             {
                 Id = s.Id,
                 Name = s.Name,
                 ShortName = s.ShortName
-            };
-        }
+            })
+            .ToListAsync();
+    }
 
-        public async Task<SubjectDto> CreateSubjectAsync(SubjectDto dto)
+    public async Task<SubjectDto?> GetSubjectByIdAsync(string id)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        var s = await context.Subjects.FindAsync(id);
+        if (s == null) return null;
+
+        return new SubjectDto
         {
-            var name = dto.Name.Trim().ToLower();
-            var shortName = dto.ShortName.Trim().ToLower();
+            Id = s.Id,
+            Name = s.Name,
+            ShortName = s.ShortName
+        };
+    }
 
-            var exists = await _context.Subjects
-                .AnyAsync(s =>
-                    s.Name.ToLower() == name ||
-                    s.ShortName.ToLower() == shortName
-                );
+    public async Task<SubjectDto> CreateSubjectAsync(SubjectDto dto)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        var name = dto.Name.Trim().ToLower();
+        var shortName = dto.ShortName.Trim().ToLower();
 
-            if (exists)
-                throw new ArgumentException("Przedmiot o podanej nazwie lub skrócie już istnieje.");
+        var exists = await context.Subjects
+            .AnyAsync(s =>
+                s.Name.ToLower() == name ||
+                s.ShortName.ToLower() == shortName
+            );
 
-            var entity = new Subject
-            {
-                Id = Guid.NewGuid().ToString(),
-                Name = dto.Name,
-                ShortName = dto.ShortName
-            };
+        if (exists)
+            throw new ArgumentException("Przedmiot o podanej nazwie lub skrócie już istnieje.");
 
-            _context.Subjects.Add(entity);
-            await _context.SaveChangesAsync();
-
-            dto.Id = entity.Id;
-            return dto;
-        }
-
-
-        public async Task<bool> UpdateSubjectAsync(SubjectDto dto)
+        var entity = new Subject
         {
-            var entity = await _context.Subjects.FindAsync(dto.Id);
-            if (entity == null)
-                return false;
+            Id = Guid.NewGuid().ToString(),
+            Name = dto.Name,
+            ShortName = dto.ShortName
+        };
 
-            // 🔐 Sprawdź czy inny przedmiot ma już taką nazwę lub skrót
-            var conflict = await _context.Subjects
-                .AnyAsync(s =>
-                    s.Id != dto.Id &&
-                    (s.Name.ToLower() == dto.Name.Trim().ToLower() ||
-                     s.ShortName.ToLower() == dto.ShortName.Trim().ToLower())
-                );
+        context.Subjects.Add(entity);
+        await context.SaveChangesAsync();
 
-            if (conflict)
-                throw new ArgumentException("Przedmiot o podanej nazwie lub skrócie już istnieje.");
+        dto.Id = entity.Id;
+        return dto;
+    }
 
-            // 📝 Aktualizacja wartości
-            entity.Name = dto.Name;
-            entity.ShortName = dto.ShortName;
+    public async Task<bool> UpdateSubjectAsync(SubjectDto dto)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        var entity = await context.Subjects.FindAsync(dto.Id);
+        if (entity == null) return false;
 
-            await _context.SaveChangesAsync();
-            return true;
-        }
+        var conflict = await context.Subjects
+            .AnyAsync(s =>
+                s.Id != dto.Id &&
+                (s.Name.ToLower() == dto.Name.Trim().ToLower() ||
+                 s.ShortName.ToLower() == dto.ShortName.Trim().ToLower())
+            );
 
-        public async Task<bool> DeleteSubjectAsync(string id)
-        {
-            var entity = await _context.Subjects.FindAsync(id);
-            if (entity == null) return false;
+        if (conflict)
+            throw new ArgumentException("Przedmiot o podanej nazwie lub skrócie już istnieje.");
 
-            _context.Subjects.Remove(entity);
-            await _context.SaveChangesAsync();
-            return true;
-        }
+        entity.Name = dto.Name;
+        entity.ShortName = dto.ShortName;
+
+        await context.SaveChangesAsync();
+        return true;
+    }
+
+    public async Task<bool> DeleteSubjectAsync(string id)
+    {
+        using var context = _contextFactory.CreateDbContext();
+        var entity = await context.Subjects.FindAsync(id);
+        if (entity == null) return false;
+
+        context.Subjects.Remove(entity);
+        await context.SaveChangesAsync();
+        return true;
     }
 }

@@ -1,0 +1,150 @@
+﻿@page "/admin/db"
+@rendermode InteractiveServer
+
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+
+<div class="card mt-4 mx-auto" style="max-width: 500px;">
+    <div class="card-body">
+        <h5 class="card-title mb-3">Administrowanie bazą danych</h5>
+
+        @if (isLoading)
+        {
+            <div class="d-flex align-items-center mb-3">
+                <div class="spinner-border text-primary me-2" role="status">
+                    <span class="visually-hidden">Ładowanie…</span>
+                </div>
+                <span>Ładuję aktualny stan bazy…</span>
+            </div>
+        }
+        else if (loadError is not null)
+        {
+            <div class="alert alert-danger mb-3" role="alert">
+                <strong>Błąd:</strong> @loadError
+            </div>
+        }
+        else
+        {
+            <div class="mb-3">
+                <label class="form-label"><strong>Aktualnie:</strong>
+                    <span class="badge @(useBackup ? "bg-secondary" : "bg-primary")">
+                        @(useBackup ? "Backup" : "Primary")
+                    </span>
+                </label>
+            </div>
+
+            <div class="mb-3">
+                <label for="dbSelect" class="form-label">Wybierz bazę:</label>
+                <select class="form-select" id="dbSelect" @bind="selectedOption">
+                    <option value="Primary">Primary</option>
+                    <option value="Backup">Backup</option>
+                </select>
+            </div>
+
+            <button class="btn btn-success" @onclick="OnSubmitAsync" disabled="@isSubmitting">
+                @if (isSubmitting)
+                {
+                    <span class="spinner-border spinner-border-sm me-2" role="status">
+                        <span class="visually-hidden">Ładowanie…</span>
+                    </span>
+                    <span>Zapisuję…</span>
+                }
+                else
+                {
+                    <span>Zapisz</span>
+                }
+            </button>
+        }
+    </div>
+</div>
+
+@code {
+    private bool useBackup;             // aktualny stan pobrany z API
+    private bool isLoading = true;      // czy trwa wczytywanie statusu
+    private bool isSubmitting = false;  // czy trwa wysyłanie zmiany
+    private string? loadError;          // ewentualny błąd przy GET
+    private string selectedOption = "Primary"; // wybrana opcja w <select>
+
+    private class StatusResponse { public bool UseBackup { get; set; } }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadStatusAsync();
+    }
+
+    /// <summary>
+    /// Pobiera GET api/db/status i ustawia useBackup + selectedOption
+    /// </summary>
+    private async Task LoadStatusAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var status = await Http.GetFromJsonAsync<StatusResponse>("api/db/status");
+            if (status is not null)
+            {
+                useBackup = status.UseBackup;
+                selectedOption = useBackup ? "Backup" : "Primary";
+            }
+            else
+            {
+                loadError = "Nie otrzymano statusu z serwera.";
+            }
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// Wywołuje POST api/db/switch z JSON { UseBackup = true/false }
+    /// Po sukcesie wymusza pełne przeładowanie strony,
+    /// dzięki czemu nowy DbContext zostanie utworzony.
+    /// </summary>
+    private async Task OnSubmitAsync()
+    {
+        isSubmitting = true;
+        bool newUseBackup = selectedOption == "Backup";
+
+        try
+        {
+            var payload = new { UseBackup = newUseBackup };
+            var response = await Http.PostAsJsonAsync("api/db/switch", payload);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                // Jeśli API zwróci błąd, przywróć poprzedni stan w UI i wyświetl alert
+                var errorDto = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                string serverMsg = (errorDto != null && errorDto.TryGetValue("error", out var err))
+                    ? err?.ToString() ?? "Nieznany błąd"
+                    : "Nieznany błąd";
+
+                await JS.InvokeVoidAsync("alert", $"Błąd przy przełączaniu bazy:\n{serverMsg}");
+                selectedOption = useBackup ? "Backup" : "Primary";
+            }
+            else
+            {
+                // Po udanym przełączeniu wymuśmy pełne przeładowanie aplikacji
+                Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Wyjątek podczas komunikacji z API:\n{ex.Message}");
+            selectedOption = useBackup ? "Backup" : "Primary";
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+}

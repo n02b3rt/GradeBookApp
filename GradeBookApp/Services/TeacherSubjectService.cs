@@ -6,17 +6,18 @@ namespace GradeBookApp.Services;
 
 public class TeacherSubjectService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-    public TeacherSubjectService(ApplicationDbContext context)
+    public TeacherSubjectService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     // Pobierz wszystkie przypisania nauczycieli do przedmiotów i klas
     public async Task<List<TeacherSubject>> GetTeacherSubjectsAsync()
     {
-        return await _context.TeacherSubjects
+        using var context = _contextFactory.CreateDbContext();
+        return await context.TeacherSubjects
             .Include(ts => ts.Teacher)
             .Include(ts => ts.Subject)
             .Include(ts => ts.Class)
@@ -26,8 +27,8 @@ public class TeacherSubjectService
     // Przypisz nauczyciela do przedmiotu i klasy
     public async Task<bool> AssignTeacherToSubjectAndClass(string teacherId, string subjectId, int classId)
     {
-        // Sprawdź, czy już istnieje
-        var exists = await _context.TeacherSubjects.AnyAsync(ts =>
+        using var context = _contextFactory.CreateDbContext();
+        var exists = await context.TeacherSubjects.AnyAsync(ts =>
             ts.TeacherId == teacherId && ts.SubjectId == subjectId && ts.ClassId == classId);
         if (exists) return false;
 
@@ -38,19 +39,20 @@ public class TeacherSubjectService
             ClassId = classId
         };
 
-        _context.TeacherSubjects.Add(ts);
-        await _context.SaveChangesAsync();
+        context.TeacherSubjects.Add(ts);
+        await context.SaveChangesAsync();
         return true;
     }
 
     // Usuń przypisanie
     public async Task<bool> RemoveTeacherSubjectAssignment(string id)
     {
-        var ts = await _context.TeacherSubjects.FindAsync(id);
+        using var context = _contextFactory.CreateDbContext();
+        var ts = await context.TeacherSubjects.FindAsync(id);
         if (ts == null) return false;
 
-        _context.TeacherSubjects.Remove(ts);
-        await _context.SaveChangesAsync();
+        context.TeacherSubjects.Remove(ts);
+        await context.SaveChangesAsync();
         return true;
     }
 }

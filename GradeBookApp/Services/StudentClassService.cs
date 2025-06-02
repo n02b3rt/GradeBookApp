@@ -6,17 +6,18 @@ namespace GradeBookApp.Services;
 
 public class StudentClassService
 {
-    private readonly ApplicationDbContext _context;
+    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-    public StudentClassService(ApplicationDbContext context)
+    public StudentClassService(IDbContextFactory<ApplicationDbContext> contextFactory)
     {
-        _context = context;
+        _contextFactory = contextFactory;
     }
 
     // Pobierz uczniów przypisanych do klasy na podstawie ClassId w użytkownikach
     public async Task<List<ApplicationUser>> GetStudentsInClassAsync(int classId)
     {
-        return await _context.Users
+        using var context = _contextFactory.CreateDbContext();
+        return await context.Users
             .Where(u => u.ClassId == classId)
             .ToListAsync();
     }
@@ -24,14 +25,16 @@ public class StudentClassService
     // Przypisz uczniów do klasy (ustaw ClassId w encji ApplicationUser)
     public async Task<bool> AssignStudentsToClass(int classId, List<string> studentIds)
     {
-        var students = await _context.Users
+        using var context = _contextFactory.CreateDbContext();
+
+        var students = await context.Users
             .Where(u => studentIds.Contains(u.Id))
             .ToListAsync();
 
-        if (students.Count == 0) return false;
+        if (!students.Any()) return false;
 
-        // Odłącz wszystkich uczniów z tej klasy (czyli ustaw ClassId=null)
-        var currentStudents = await _context.Users
+        // Odłącz wszystkich uczniów z tej klasy (czyli ustaw ClassId = null)
+        var currentStudents = await context.Users
             .Where(u => u.ClassId == classId)
             .ToListAsync();
 
@@ -46,7 +49,7 @@ public class StudentClassService
             student.ClassId = classId;
         }
 
-        await _context.SaveChangesAsync();
+        await context.SaveChangesAsync();
         return true;
     }
 }
