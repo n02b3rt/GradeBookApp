@@ -1,0 +1,121 @@
+﻿@page "/teacher/grades/class/{ClassId:int}/add/{SubjectId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<div class="container mt-4">
+    <h2 class="mb-4" style="color: #f39c12;">Add Grades to Class</h2>
+    <p><strong>Class ID:</strong> @ClassId | <strong>Subject:</strong> @SubjectId</p>
+
+    <EditForm Model="formModel" OnValidSubmit="SaveGrades">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="mb-3 row">
+            <div class="col-md-2">
+                <label class="form-label">Weight</label>
+                <InputNumber class="form-control" @bind-Value="formModel.GlobalWeight" min="1" max="10" />
+            </div>
+            <div class="col-md-10">
+                <label class="form-label">Description</label>
+                <InputText class="form-control" @bind-Value="formModel.GlobalDescription" />
+            </div>
+        </div>
+
+        <table class="table table-bordered table-hover">
+            <thead class="table-warning">
+                <tr>
+                    <th>#</th>
+                    <th>Full Name</th>
+                    <th>User ID</th>
+                    <th>Grade</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var (entry, index) in formModel.GradeList.Select((g, i) => (g, i + 1)))
+                {
+                    <tr>
+                        <td>@index</td>
+                        <td>@entry.StudentName</td>
+                        <td><code>@entry.StudentId</code></td>
+                        <td>
+                            <InputNumber class="form-control" @bind-Value="entry.Value" min="0" max="6" />
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+        <button class="btn btn-success mt-3">
+            <i class="bi bi-check-circle"></i> Submit Grades
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter] public int ClassId { get; set; }
+    [Parameter] public string SubjectId { get; set; } = "";
+
+    private string teacherId = "";
+    private GradeFormModel formModel = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        teacherId = user.FindFirst("sub")?.Value ??
+                    user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+        var students = await TeacherService.GetStudentsInClassAsync(ClassId);
+
+        formModel.GradeList = students.Select(s => new GradeEntry
+        {
+            StudentId = s.Id,
+            StudentName = $"{s.FirstName} {s.LastName}",
+            Value = 0
+        }).ToList();
+    }
+
+    private async Task SaveGrades()
+    {
+        var now = DateTime.UtcNow;
+
+        var gradesToSave = formModel.GradeList
+            .Where(g => g.Value > 0)
+            .Select(g => new GradeDto
+            {
+                StudentId = g.StudentId,
+                TeacherId = teacherId,
+                SubjectId = SubjectId,
+                Value = g.Value,
+                Weight = formModel.GlobalWeight,
+                Description = formModel.GlobalDescription,
+                DateGiven = now
+            })
+            .ToList();
+
+        if (gradesToSave.Any())
+        {
+            await TeacherService.SaveGradesBulkAsync(gradesToSave);
+            Navigation.NavigateTo($"/teacher/class/{ClassId}/students");
+        }
+    }
+
+    private class GradeFormModel
+    {
+        public int GlobalWeight { get; set; } = 1;
+        public string GlobalDescription { get; set; } = string.Empty;
+        public List<GradeEntry> GradeList { get; set; } = new();
+    }
+
+    private class GradeEntry
+    {
+        public string StudentId { get; set; } = string.Empty;
+        public string StudentName { get; set; } = string.Empty;
+        public int Value { get; set; }
+    }
+}

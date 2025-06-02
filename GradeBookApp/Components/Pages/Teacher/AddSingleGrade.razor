@@ -1,0 +1,102 @@
+﻿@page "/teacher/grades/add/{StudentId}/{SubjectId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject HttpClient Http
+
+<h3 class="mt-4 mb-3" style="color: #f39c12;">Add Grade</h3>
+
+@if (loading)
+{
+    <p><em>Loading student info...</em></p>
+}
+else if (student == null)
+{
+    <div class="alert alert-danger">Student not found.</div>
+}
+else
+{
+    <div class="card shadow p-3 mb-4">
+        <div class="card-body">
+            <h5>Student: <strong>@student.FirstName @student.LastName</strong></h5>
+
+            <EditForm Model="@gradeModel" OnValidSubmit="@HandleValidSubmit" FormName="AddGradeForm">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label">Grade Value</label>
+                    <InputNumber @bind-Value="gradeModel.Value" class="form-control" />
+                    <ValidationMessage For="@(() => gradeModel.Value)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Weight</label>
+                    <InputNumber @bind-Value="gradeModel.Weight" class="form-control" />
+                    <ValidationMessage For="@(() => gradeModel.Weight)" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <InputText @bind-Value="gradeModel.Description" class="form-control" />
+                    <ValidationMessage For="@(() => gradeModel.Description)" />
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Submit Grade
+                </button>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string StudentId { get; set; } = string.Empty;
+    [Parameter] public string SubjectId { get; set; } = string.Empty;
+
+    private UserDto? student;
+    private GradeDto gradeModel = new();
+    private bool loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+            var user = authState.User;
+            var teacherId = user.FindFirst("sub")?.Value
+                            ?? user.FindFirst("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier")?.Value;
+
+            if (string.IsNullOrEmpty(teacherId))
+                return;
+
+            student = await Http.GetFromJsonAsync<UserDto>($"/api/users/{StudentId}");
+
+            if (student is not null)
+            {
+                gradeModel.StudentId = StudentId;
+                gradeModel.SubjectId = SubjectId;
+                gradeModel.TeacherId = teacherId;
+                // Użytkownik uzupełni Value, Weight, Description
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error fetching student: {ex.Message}");
+        }
+
+        loading = false;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        gradeModel.DateGiven = DateTime.UtcNow; // Zawsze UTC
+
+        await TeacherService.AddGradeAsync(gradeModel);
+
+        Navigation.NavigateTo($"/teacher/class/{student?.ClassId}/students");
+    }
+}
