@@ -1,13 +1,27 @@
 ﻿@page "/teacher/class/{ClassId:int}/students"
+@rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
 @inject TeacherActionsService TeacherService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
 
 <div class="container mt-4">
     <h2 class="mb-3" style="color: #f39c12;">
         <i class="bi bi-people-fill"></i> Students in Class <strong>@ClassName</strong>
     </h2>
+
+    <div class="mb-3 d-flex gap-2">
+        <button class="btn btn-outline-primary" @onclick="@(() => Navigation.NavigateTo($"/teacher/grades/class/{ClassId}/add/{SubjectId}"))">
+            <i class="bi bi-plus-circle"></i> Add Grades to Entire Class
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="@(() => Navigation.NavigateTo($"/teacher/attendance/{ClassId}/{SubjectId}"))">
+            <i class="bi bi-calendar-check"></i> Check Attendance
+        </button>
+        <button class="btn btn-outline-info" @onclick="@(() => Navigation.NavigateTo($"/teacher/attendance/class/{ClassId}/{SubjectId}"))">
+            <i class="bi bi-eye"></i> Zobacz obecności
+        </button>
+    </div>
 
     @if (loading)
     {
@@ -21,46 +35,92 @@
     {
         <table class="table table-bordered table-striped">
             <thead style="background-color: #f39c12; color: white;">
-                <tr>
-                    <th>#</th>
-                    <th>Full Name</th>
-                    <th>Grades</th>
-                    <th>Actions</th>
-                </tr>
+            <tr>
+                <th>#</th>
+                <th>Full Name</th>
+                <th>E-mail</th>
+                <th>Grades</th>
+                <th>Average</th>
+                <th>Actions</th>
+            </tr>
             </thead>
             <tbody>
-                @foreach (var (student, index) in students.Select((s, i) => (s, i + 1)))
-                {
-                    <tr>
-                        <td>@index</td>
-                        <td>@student.FirstName @student.LastName</td>
-                        <td>
-                            @if (gradesByStudent.TryGetValue(student.Id, out var grades) && grades.Any())
+            @foreach (var (student, index) in students.Select((s, i) => (s, i + 1)))
+            {
+                <tr>
+                    <td>@index</td>
+                    <td>@student.FirstName @student.LastName</td>
+                    <td>@student.Email</td>
+                    <td>
+                        @if (gradesByStudent.TryGetValue(student.Id, out var studentGrades) && studentGrades.Any())
+                        {
+                            foreach (var grade in studentGrades)
                             {
-                                @foreach (var grade in grades)
-                                {
-                                    <span class="badge rounded-pill text-white me-1 mb-1"
-                                          style="background-color: #f39c12;"
-                                          title="@($"Value: {grade.Value}, Weight: {grade.Weight}, Desc: {grade.Description}, Date: {grade.DateGiven:yyyy-MM-dd}")">
-                                        @grade.Value
-                                    </span>
-                                }
+                                <span class="badge rounded-pill text-white me-1 mb-1"
+                                      style="background-color: #f39c12; cursor: pointer;"
+                                      title="@($"Value: {grade.Value}, Weight: {grade.Weight}, Desc: {grade.Description}, Date: {grade.DateGiven:yyyy-MM-dd}")"
+                                      @onclick="() => ShowGradeModal(grade)">
+                                    @grade.Value
+                                </span>
                             }
-                            else
-                            {
-                                <span class="text-muted">No grades</span>
-                            }
-                        </td>
-                        <td>
-                            <a class="btn btn-sm btn-success"
-                               href="/teacher/grades/add/@student.Id/@SubjectId">
-                                <i class="bi bi-plus-circle"></i> Add Grade
-                            </a>
-                        </td>
-                    </tr>
-                }
+                        }
+                        else
+                        {
+                            <span class="text-muted">No grades</span>
+                        }
+                    </td>
+                    <td>
+                        @if (gradesByStudent.TryGetValue(student.Id, out var grades) && grades.Any())
+                        {
+                            var totalWeight = grades.Sum(g => g.Weight);
+                            var weightedSum = grades.Sum(g => g.Value * g.Weight);
+                            var avg = totalWeight > 0 ? Math.Round((double)weightedSum / totalWeight, 2) : 0;
+                            <span class="fw-bold">@avg</span>
+                        }
+                        else
+                        {
+                            <span class="text-muted">–</span>
+                        }
+                    </td>
+                    <td>
+                        <a class="btn btn-sm btn-success"
+                           href="/teacher/grades/add/@student.Id/@SubjectId">
+                            <i class="bi bi-plus-circle"></i> Add Grade
+                        </a>
+                    </td>
+                </tr>
+            }
             </tbody>
         </table>
+    }
+
+    @if (selectedGrade != null)
+    {
+        <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Szczegóły oceny</h5>
+                        <button type="button" class="btn-close" @onclick="CloseModal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p><strong>Wartość:</strong> @selectedGrade.Value</p>
+                        <p><strong>Waga:</strong> @selectedGrade.Weight</p>
+                        <p><strong>Opis:</strong> @selectedGrade.Description</p>
+                        <p><strong>Data:</strong> @selectedGrade.DateGiven.ToString("yyyy-MM-dd")</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-warning" @onclick="EditGrade">
+                            <i class="bi bi-pencil"></i> Edytuj
+                        </button>
+                        <button class="btn btn-danger" @onclick="DeleteGrade">
+                            <i class="bi bi-trash"></i> Usuń
+                        </button>
+                        <button class="btn btn-secondary" @onclick="CloseModal">Zamknij</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     }
 </div>
 
@@ -72,6 +132,8 @@
     private string? SubjectId;
     private string ClassName = "";
     private bool loading = true;
+
+    private GradeDto? selectedGrade;
 
     protected override async Task OnInitializedAsync()
     {
@@ -85,9 +147,8 @@
 
         students = await TeacherService.GetStudentsInClassAsync(ClassId);
 
-        // Pobierz przypisany do tej klasy przedmiot nauczyciela
         var ts = (await TeacherService.GetTeacherSubjectsAsync(teacherId))
-                    .FirstOrDefault(t => t.ClassId == ClassId);
+            .FirstOrDefault(t => t.ClassId == ClassId);
 
         if (ts is null)
         {
@@ -105,4 +166,35 @@
 
         loading = false;
     }
+
+    private void ShowGradeModal(GradeDto grade)
+    {
+        selectedGrade = grade;
+    }
+
+    private void CloseModal()
+    {
+        selectedGrade = null;
+    }
+
+    private void EditGrade()
+    {
+        if (selectedGrade is not null)
+        {
+            Navigation.NavigateTo($"/teacher/grades/edit/{selectedGrade.Id}");
+        }
+    }
+
+    private async Task DeleteGrade()
+    {
+        if (selectedGrade is not null)
+        {
+            await TeacherService.DeleteGradeAsync(selectedGrade.Id);
+            selectedGrade = null;
+
+            // Twarde przeładowanie strony po usunięciu
+            Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+        }
+    }
+
 }
