@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+
 @inject UserService UserService
+@inject ClassService ClassService
 @inject NavigationManager NavigationManager
 
 <div class="container">
@@ -109,13 +111,20 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Pobieramy dane użytkownika
         user = await UserService.GetUserByIdAsync(UserId);
-        classes = await UserService.GetClassesAsync(); // lub z Http.GetFromJsonAsync jeśli masz endpoint
+
+        // Jeśli to uczeń (HireDate == null), to ładujemy listę klas
+        if (user?.HireDate == null)
+        {
+            classes = await ClassService.GetClassesAsync();
+        }
     }
 
     private async Task HandleValidSubmit()
     {
-        if (user == null) return;
+        if (user == null) 
+            return;
 
         var result = await UserService.UpdateUserAsync(UserId, user);
         if (result.Succeeded)

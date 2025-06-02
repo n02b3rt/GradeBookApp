@@ -98,8 +98,25 @@ using (var scope = app.Services.CreateScope())
     var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
 
-    await dbContext.Database.MigrateAsync();
-    await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
+    // Jeśli chcesz to robić tylko w Development:
+    if (app.Environment.IsDevelopment())
+    {
+        // 1. Usuń obecną bazę
+        await dbContext.Database.EnsureDeletedAsync();
+
+        // 2. Utwórz ją od nowa na podstawie migracji
+        await dbContext.Database.MigrateAsync();
+
+        // 3. Uruchom seeder, żeby zasypać świeżo stworzonymi danymi
+        await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
+    }
+    else
+    {
+        // W środowisku produkcyjnym lub testowym
+        // możesz po prostu wgrać brakujące migracje i _nie_ usuwać wszystkiego:
+        await dbContext.Database.MigrateAsync();
+        await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
+    }
 }
 
 app.Run();

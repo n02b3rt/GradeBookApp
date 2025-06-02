@@ -1,4 +1,10 @@
-﻿namespace GradeBookApp.Shared
+﻿// ﻿GradeBookApp.Shared/UserDto.cs
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace GradeBookApp.Shared
 {
     public class UserDto
     {
@@ -14,8 +20,22 @@
         public DateOnly? EnrollmentDate { get; set; }
         public DateOnly? HireDate { get; set; }
         public int? ClassId { get; set; }
-        
-        public List<string> Roles { get; set; } = new();  // <-- Dodane
+
+        // Lista ról przypisanych do użytkownika
+        public List<string> Roles { get; set; } = new();
+
+        // Pomocnicza właściwość łącząca wszystkie role w jeden ciąg (lub zwracająca "(brak)")
+        public string RolesDisplay
+        {
+            get
+            {
+                if (Roles == null || !Roles.Any())
+                    return "(brak)";
+                return string.Join(", ", Roles);
+            }
+        }
+
+        // (opcjonalnie) wygodna właściwość łącząca imię i nazwisko
         public string FullName => $"{FirstName} {LastName}";
     }
 }

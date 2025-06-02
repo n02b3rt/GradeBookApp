@@ -1,11 +1,13 @@
-﻿using GradeBookApp.Data.Entities;
+﻿// ﻿GradeBookApp.Services/UserService.cs
+
+using GradeBookApp.Data;
+using GradeBookApp.Data.Entities;
 using GradeBookApp.Shared;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using GradeBookApp.Data;
 
 namespace GradeBookApp.Services
 {
@@ -13,42 +15,66 @@ namespace GradeBookApp.Services
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly ApplicationDbContext _context;
-        
+
         public UserService(UserManager<ApplicationUser> userManager, ApplicationDbContext context)
         {
             _userManager = userManager;
             _context = context;
         }
 
-        // Pobierz listę użytkowników
+        /// <summary>
+        /// Pobiera wszystkich użytkowników i wypełnia DTO wraz z przypisanymi rolami.
+        /// </summary>
         public async Task<List<UserDto>> GetUsersAsync()
         {
+            // 1. Pobierz listę wszystkich ApplicationUser
             var users = await _userManager.Users.ToListAsync();
 
-            return users.Select(u => new UserDto
+            // 2. For each user, pobieramy listę ról i wypełniamy DTO
+            var result = new List<UserDto>();
+            foreach (var u in users)
             {
-                Id = u.Id,
-                UserName = u.UserName!,
-                Email = u.Email!,
-                FirstName = u.FirstName!,
-                LastName = u.LastName!,
-                BirthDate = u.BirthDate,
-                Gender = u.Gender,
-                Address = u.Address,
-                PESEL = u.PESEL,
-                EnrollmentDate = u.EnrollmentDate,
-                HireDate = u.HireDate,
-                ClassId = u.ClassId
-            }).ToList();
+                // Pobranie ról z Identity
+                var roles = await _userManager.GetRolesAsync(u);
+
+                // Mapa na UserDto
+                var dto = new UserDto
+                {
+                    Id = u.Id,
+                    UserName = u.UserName!,
+                    Email = u.Email!,
+                    FirstName = u.FirstName!,
+                    LastName = u.LastName!,
+                    BirthDate = u.BirthDate,
+                    Gender = u.Gender,
+                    Address = u.Address,
+                    PESEL = u.PESEL,
+                    EnrollmentDate = u.EnrollmentDate,
+                    HireDate = u.HireDate,
+                    ClassId = u.ClassId,
+                    Roles = roles.ToList()
+                };
+
+                result.Add(dto);
+            }
+
+            return result;
         }
 
-        // Pobierz użytkownika po Id
+        /// <summary>
+        /// Pobiera jednego użytkownika po Id i wypełnia DTO włącznie z rolami.
+        /// </summary>
         public async Task<UserDto?> GetUserByIdAsync(string id)
         {
+            // 1. Znajdź ApplicationUser po Id
             var user = await _userManager.FindByIdAsync(id);
             if (user == null) return null;
 
-            return new UserDto
+            // 2. Pobranie listy ról z Identity
+            var roles = await _userManager.GetRolesAsync(user);
+
+            // 3. Utworzenie DTO
+            var userDto = new UserDto
             {
                 Id = user.Id,
                 UserName = user.UserName!,
@@ -61,14 +87,18 @@ namespace GradeBookApp.Services
                 PESEL = user.PESEL,
                 EnrollmentDate = user.EnrollmentDate,
                 HireDate = user.HireDate,
-                ClassId = user.ClassId
+                ClassId = user.ClassId,
+                Roles = roles.ToList()
             };
+
+            return userDto;
         }
 
-        // Utwórz nowego użytkownika (z hasłem i domyślną rolą np. "Student")
+        /// <summary>
+        /// Tworzy nowego użytkownika z podanym hasłem i przypisuje mu domyślną rolę (np. "Student").
+        /// </summary>
         public async Task<IdentityResult> CreateUserAsync(UserDto userDto, string password, string role = "Student")
         {
-            // Sprawdź poprawność imienia i nazwiska
             if (string.IsNullOrWhiteSpace(userDto.FirstName) || string.IsNullOrWhiteSpace(userDto.LastName))
             {
                 return IdentityResult.Failed(new IdentityError { Description = "Imię i nazwisko są wymagane do wygenerowania loginu i emaila." });
@@ -105,21 +135,23 @@ namespace GradeBookApp.Services
             if (!roleResult.Succeeded)
                 return roleResult;
 
-            // Aktualizuj dane DTO, żeby frontend mógł je dostać (opcjonalnie)
+            // (opcjonalnie) zaktualizuj w DTO wygenerowane UserName i Email
             userDto.UserName = user.UserName;
             userDto.Email = user.Email;
 
             return IdentityResult.Success;
         }
 
-
-        // Aktualizuj istniejącego użytkownika
+        /// <summary>
+        /// Aktualizuje dane użytkownika i (opcjonalnie) zmienia rolę.
+        /// </summary>
         public async Task<IdentityResult> UpdateUserAsync(string id, UserDto userDto, string? role = null)
         {
             var user = await _userManager.FindByIdAsync(id);
             if (user == null)
                 return IdentityResult.Failed(new IdentityError { Description = "User not found." });
 
+            // 1. Aktualizacja pól podstawowych
             user.UserName = userDto.UserName;
             user.Email = userDto.Email;
             user.FirstName = userDto.FirstName;
@@ -136,9 +168,11 @@ namespace GradeBookApp.Services
             if (!result.Succeeded)
                 return result;
 
+            // 2. Jeżeli przekazano parametr role, to zmieniamy dotychczasowe role na tę nową
             if (role != null)
             {
                 var currentRoles = await _userManager.GetRolesAsync(user);
+                // jeśli aktualnie nie ma tej roli, to ją nadaj, usuwając wszystkie poprzednie
                 if (!currentRoles.Contains(role))
                 {
                     var removeResult = await _userManager.RemoveFromRolesAsync(user, currentRoles);
@@ -154,8 +188,9 @@ namespace GradeBookApp.Services
             return IdentityResult.Success;
         }
 
-
-        // Usuń użytkownika
+        /// <summary>
+        /// Usuwa użytkownika.
+        /// </summary>
         public async Task<IdentityResult> DeleteUserAsync(string id)
         {
             var user = await _userManager.FindByIdAsync(id);
@@ -165,7 +200,10 @@ namespace GradeBookApp.Services
             return await _userManager.DeleteAsync(user);
         }
 
-        // Wyszukaj użytkowników wg zapytania (opcjonalne)
+        /// <summary>
+        /// Wyszukuje użytkowników według frazy (UserName, Email, FirstName, LastName).
+        /// Role w wynikach nie są tu wypełniane (można dodać analogicznie jak w GetUsersAsync).
+        /// </summary>
         public async Task<List<UserDto>> SearchUsersAsync(string query)
         {
             if (string.IsNullOrWhiteSpace(query))
@@ -182,21 +220,41 @@ namespace GradeBookApp.Services
                             || u.LastName!.ToLower().Contains(query))
                 .ToListAsync();
 
-            return users.Select(u => new UserDto
+            var result = new List<UserDto>();
+            foreach (var u in users)
             {
-                Id = u.Id,
-                UserName = u.UserName!,
-                Email = u.Email!,
-                FirstName = u.FirstName!,
-                LastName = u.LastName!
-            }).ToList();
+                var roles = await _userManager.GetRolesAsync(u);
+                var dto = new UserDto
+                {
+                    Id = u.Id,
+                    UserName = u.UserName!,
+                    Email = u.Email!,
+                    FirstName = u.FirstName!,
+                    LastName = u.LastName!,
+                    BirthDate = u.BirthDate,
+                    Gender = u.Gender,
+                    Address = u.Address,
+                    PESEL = u.PESEL,
+                    EnrollmentDate = u.EnrollmentDate,
+                    HireDate = u.HireDate,
+                    ClassId = u.ClassId,
+                    Roles = roles.ToList()
+                };
+                result.Add(dto);
+            }
+
+            return result;
         }
 
+        /// <summary>
+        /// Pobiera użytkowników, którzy są w roli "Teacher".  
+        /// Tu ręcznie ustawiamy w DTO listę ról jako ["Teacher"].
+        /// </summary>
         public async Task<List<UserDto>> GetTeachersAsync()
         {
             var usersInRole = await _userManager.GetUsersInRoleAsync("Teacher");
 
-            return usersInRole.Select(u => new UserDto
+            var result = usersInRole.Select(u => new UserDto
             {
                 Id = u.Id,
                 UserName = u.UserName ?? "",
@@ -207,12 +265,18 @@ namespace GradeBookApp.Services
                 Gender = u.Gender,
                 Address = u.Address,
                 PESEL = u.PESEL,
+                EnrollmentDate = u.EnrollmentDate,
                 HireDate = u.HireDate,
                 ClassId = u.ClassId,
-                Roles = new List<string> { "Teacher" } // domyślna rola
+                Roles = new List<string> { "Teacher" }
             }).ToList();
+
+            return result;
         }
-        
+
+        /// <summary>
+        /// Pomocnicza metoda do wyliczania kolejnego numeru suffixu do unikalnego UserName.
+        /// </summary>
         public async Task<int> GetNextUsernameSuffixAsync(string baseUsername)
         {
             var existing = await _context.Users
@@ -226,12 +290,11 @@ namespace GradeBookApp.Services
                 var suffix = name.Substring(baseUsername.Length);
                 if (int.TryParse(suffix, out int number))
                 {
-                    max = Math.Max(max, number);
+                    max = System.Math.Max(max, number);
                 }
             }
 
             return max + 1;
         }
-
     }
 }

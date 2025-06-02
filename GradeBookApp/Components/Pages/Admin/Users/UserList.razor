@@ -1,7 +1,11 @@
 ﻿@page "/admin/dashboard/users"
 @rendermode InteractiveServer
+
+@using System.Linq
+@using System.Net.Http.Json
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+
 @inject UserService UserService
 @inject NavigationManager NavigationManager
 @inject HttpClient Http
@@ -20,11 +24,14 @@
         <div class="card-body">
             <EditForm Model="searchModel" OnValidSubmit="HandleSearch">
                 <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-semibold">🔍 Szukaj użytkownika</label>
-                        <InputText @bind-Value="searchModel.Query" class="form-control" placeholder="Imię, nazwisko, e-mail lub login"/>
-                    </div>
+                    <!-- Pole do wyszukiwania po loginie/imię/nazwisku/email -->
                     <div class="col-md-4 mb-3">
+                        <label class="form-label fw-semibold">🔍 Szukaj użytkownika</label>
+                        <InputText @bind-Value="searchModel.Query" class="form-control" placeholder="Imię, nazwisko, e-mail lub login" />
+                    </div>
+
+                    <!-- Pole do filtrowania po klasie -->
+                    <div class="col-md-3 mb-3">
                         <label class="form-label fw-semibold">🏷️ Klasa</label>
                         <select class="form-select" @bind="searchModel.ClassId">
                             <option value="">Wszystkie klasy</option>
@@ -34,6 +41,20 @@
                             }
                         </select>
                     </div>
+
+                    <!-- Pole do filtrowania po roli -->
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-semibold">🔒 Rola</label>
+                        <select class="form-select" @bind="searchModel.Role">
+                            <option value="">Wszystkie role</option>
+                            @foreach (var role in roleOptions)
+                            {
+                                <option value="@role">@role</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Przycisk Szukaj -->
                     <div class="col-md-2 mb-3 d-flex align-items-end">
                         <button type="submit" class="btn btn-primary w-100 fw-semibold">🔎 Szukaj</button>
                     </div>
@@ -46,9 +67,9 @@
     {
         <div class="text-muted">⏳ Ładowanie użytkowników...</div>
     }
-    else if (users.Count == 0)
+    else if (!users.Any())
     {
-        <div class="alert alert-info">Brak użytkowników.</div>
+        <div class="alert alert-info">Brak użytkowników spełniających kryteria.</div>
     }
     else
     {
@@ -57,31 +78,33 @@
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="table-light">
-                        <tr>
-                            <th>👤 Login</th>
-                            <th>📧 E-mail</th>
-                            <th>🧍 Imię</th>
-                            <th>🧍‍♂️ Nazwisko</th>
-                            <th>🏷️ Klasa</th>
-                            <th class="text-end">⚙️ Akcje</th>
-                        </tr>
+                            <tr>
+                                <th>Login</th>
+                                <th>E-mail</th>
+                                <th>Imię</th>
+                                <th>Nazwisko</th>
+                                <th>Klasa</th>
+                                <th>Rola</th>
+                                <th class="text-end">⚙️ Akcje</th>
+                            </tr>
                         </thead>
                         <tbody>
-                        @foreach (var user in users)
-                        {
-                            var userClass = classOptions.FirstOrDefault(c => c.Id == user.ClassId)?.Name ?? "-";
-                            <tr>
-                                <td>@user.UserName</td>
-                                <td>@user.Email</td>
-                                <td>@user.FirstName</td>
-                                <td>@user.LastName</td>
-                                <td>@userClass</td>
-                                <td class="text-end">
-                                    <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditUser(user.Id)">✏️ Edytuj</button>
-                                    <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUser(user.Id)">🗑️ Usuń</button>
-                                </td>
-                            </tr>
-                        }
+                            @foreach (var user in users)
+                            {
+                                var userClass = classOptions.FirstOrDefault(c => c.Id == user.ClassId)?.Name ?? "-";
+                                <tr>
+                                    <td>@user.UserName</td>
+                                    <td>@user.Email</td>
+                                    <td>@user.FirstName</td>
+                                    <td>@user.LastName</td>
+                                    <td>@userClass</td>
+                                    <td>@user.RolesDisplay</td>
+                                    <td class="text-end">
+                                        <button class="btn btn-sm btn-outline-secondary me-1" @onclick="() => EditUser(user.Id)">✏️ Edytuj</button>
+                                        <button class="btn btn-sm btn-outline-danger" @onclick="() => DeleteUser(user.Id)">🗑️ Usuń</button>
+                                    </td>
+                                </tr>
+                            }
                         </tbody>
                     </table>
                 </div>
@@ -93,14 +116,9 @@
 @code {
     private List<UserDto>? users;
     private List<ClassOption> classOptions = new();
+    private List<string> roleOptions = new();
     private SearchModel searchModel = new();
 
-    private void AddUser()
-    {
-        NavigationManager.NavigateTo("/admin/dashboard/users/add");
-    }
-
-    
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
@@ -108,21 +126,46 @@
 
     private async Task LoadData()
     {
+        // 1. Pobranie wszystkich użytkowników
         users = await UserService.GetUsersAsync();
-        classOptions = await Http.GetFromJsonAsync<List<ClassOption>>("api/classes/simple") ?? new();
+
+        // 2. Pobranie opcji klas (np. id + nazwa) do <select>
+        classOptions = await Http.GetFromJsonAsync<List<ClassOption>>("api/classes/simple")
+                       ?? new List<ClassOption>();
+
+        // 3. Pobranie dostępnych ról (endpoint publiczny /api/users/roles)
+        roleOptions = await Http.GetFromJsonAsync<List<string>>("api/users/roles")
+                      ?? new List<string>();
+    }
+
+    private void AddUser()
+    {
+        NavigationManager.NavigateTo("/admin/dashboard/users/add");
     }
 
     private async Task HandleSearch()
     {
+        // 1. Pobierz listę użytkowników spełniających kryterium tekstowe
         var allUsers = await UserService.SearchUsersAsync(searchModel.Query);
+
+        // 2. Filtrowanie po klasie (jeśli wybrano konkretną klasę)
         if (!string.IsNullOrEmpty(searchModel.ClassId))
         {
-            users = allUsers.Where(u => u.ClassId?.ToString() == searchModel.ClassId).ToList();
+            allUsers = allUsers
+                .Where(u => u.ClassId?.ToString() == searchModel.ClassId)
+                .ToList();
         }
-        else
+
+        // 3. Filtrowanie po roli (jeśli wybrano konkretną rolę)
+        if (!string.IsNullOrEmpty(searchModel.Role))
         {
-            users = allUsers;
+            allUsers = allUsers
+                .Where(u => u.Roles.Contains(searchModel.Role))
+                .ToList();
         }
+
+        // Przypisz przefiltrowaną kolekcję do wyświetlenia
+        users = allUsers;
     }
 
     private void EditUser(string id)
@@ -135,7 +178,12 @@
         var result = await UserService.DeleteUserAsync(id);
         if (result.Succeeded)
         {
+            // Po udanym usunięciu odśwież listę
             users = await UserService.GetUsersAsync();
+        }
+        else
+        {
+            // Możesz tu dodać powiadomienie o błędzie
         }
     }
 
@@ -143,11 +191,12 @@
     {
         public string Query { get; set; } = string.Empty;
         public string? ClassId { get; set; }
+        public string? Role { get; set; }
     }
 
     private class ClassOption
     {
         public int Id { get; set; }
-        public string Name { get; set; } = "";
+        public string Name { get; set; } = string.Empty;
     }
 }
