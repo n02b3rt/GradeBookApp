@@ -1,9 +1,11 @@
-﻿@page "/admin/dashboard/subjects/add"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/subjects/add"
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 
 <div class="container my-4">
     <h2 class="mb-4 fw-bold text-dark">➕ Dodaj nowy przedmiot</h2>

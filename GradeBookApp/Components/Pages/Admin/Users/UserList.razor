@@ -1,10 +1,12 @@
-﻿@page "/admin/dashboard/users"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/users"
 @rendermode InteractiveServer
 
 @using System.Linq
 @using System.Net.Http.Json
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 
 @inject UserService UserService
 @inject NavigationManager NavigationManager

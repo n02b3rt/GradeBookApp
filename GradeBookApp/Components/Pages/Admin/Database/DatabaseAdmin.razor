@@ -1,11 +1,13 @@
-﻿@page "/admin/db"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/db"
+@using Microsoft.AspNetCore.Authorization
 @rendermode InteractiveServer
 
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JS
 
-<div class="card mt-4 mx-auto" style="max-width: 500px;">
+<div class="card mt-4 mx-auto" style="max-width: 600px;">
     <div class="card-body">
         <h5 class="card-title mb-3">Administrowanie bazą danych</h5>
 
@@ -34,53 +36,75 @@
                 </label>
             </div>
 
-            <div class="mb-3">
-                <label for="dbSelect" class="form-label">Wybierz bazę:</label>
-                <select class="form-select" id="dbSelect" @bind="selectedOption">
-                    <option value="Primary">Primary</option>
-                    <option value="Backup">Backup</option>
-                </select>
+            <div class="mb-3 row">
+                <div class="col-6">
+                    <label for="dbSelect" class="form-label">Wybierz bazę:</label>
+                    <select class="form-select" id="dbSelect" @bind="selectedOption">
+                        <option value="Primary">Primary</option>
+                        <option value="Backup">Backup</option>
+                    </select>
+                </div>
+                <div class="col-6 text-end align-self-end">
+                    <button class="btn btn-success me-2" @onclick="OnSubmitAsync" disabled="@isSubmitting">
+                        @if (isSubmitting)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Ładowanie…</span>
+                            </span>
+                            <span>Zapisuję…</span>
+                        }
+                        else
+                        {
+                            <span>Zapisz</span>
+                        }
+                    </button>
+                    <button class="btn btn-warning" @onclick="OnSyncAsync" disabled="@isSyncing">
+                        @if (isSyncing)
+                        {
+                            <span class="spinner-border spinner-border-sm me-2" role="status">
+                                <span class="visually-hidden">Synchronizacja…</span>
+                            </span>
+                            <span>Synchronizuję…</span>
+                        }
+                        else
+                        {
+                            <span>Synchronizuj</span>
+                        }
+                    </button>
+                </div>
             </div>
 
-            <button class="btn btn-success" @onclick="OnSubmitAsync" disabled="@isSubmitting">
-                @if (isSubmitting)
-                {
-                    <span class="spinner-border spinner-border-sm me-2" role="status">
-                        <span class="visually-hidden">Ładowanie…</span>
-                    </span>
-                    <span>Zapisuję…</span>
-                }
-                else
-                {
-                    <span>Zapisz</span>
-                }
-            </button>
+            @if (syncMessage is not null)
+            {
+                <div class="alert alert-info mt-3">
+                    @syncMessage
+                </div>
+            }
         }
     </div>
 </div>
 
 @code {
-    private bool useBackup;             // aktualny stan pobrany z API
-    private bool isLoading = true;      // czy trwa wczytywanie statusu
-    private bool isSubmitting = false;  // czy trwa wysyłanie zmiany
-    private string? loadError;          // ewentualny błąd przy GET
-    private string selectedOption = "Primary"; // wybrana opcja w <select>
+    private bool useBackup;
+    private bool isLoading = true;
+    private bool isSubmitting = false;
+    private bool isSyncing = false;
+    private string? loadError;
+    private string selectedOption = "Primary";
+    private string? syncMessage;
+    private int studentsCount = -1;
 
     private class StatusResponse { public bool UseBackup { get; set; } }
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadStatusAsync();
+        isLoading = true;
+        await Task.WhenAll(LoadStatusAsync(), LoadStudentsCountAsync());
+        isLoading = false;
     }
 
-    /// <summary>
-    /// Pobiera GET api/db/status i ustawia useBackup + selectedOption
-    /// </summary>
     private async Task LoadStatusAsync()
     {
-        isLoading = true;
-        loadError = null;
-
         try
         {
             var status = await Http.GetFromJsonAsync<StatusResponse>("api/db/status");
@@ -98,21 +122,26 @@
         {
             loadError = ex.Message;
         }
-        finally
+    }
+
+    private async Task LoadStudentsCountAsync()
+    {
+        try
         {
-            isLoading = false;
-            StateHasChanged();
+            var result = await Http.GetStringAsync("api/users/count");
+            studentsCount = int.TryParse(result, out var count) ? count : -1;
+        }
+        catch
+        {
+            studentsCount = -1;
         }
     }
 
-    /// <summary>
-    /// Wywołuje POST api/db/switch z JSON { UseBackup = true/false }
-    /// Po sukcesie wymusza pełne przeładowanie strony,
-    /// dzięki czemu nowy DbContext zostanie utworzony.
-    /// </summary>
+
     private async Task OnSubmitAsync()
     {
         isSubmitting = true;
+        syncMessage = null;
         bool newUseBackup = selectedOption == "Backup";
 
         try
@@ -122,7 +151,6 @@
 
             if (!response.IsSuccessStatusCode)
             {
-                // Jeśli API zwróci błąd, przywróć poprzedni stan w UI i wyświetl alert
                 var errorDto = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
                 string serverMsg = (errorDto != null && errorDto.TryGetValue("error", out var err))
                     ? err?.ToString() ?? "Nieznany błąd"
@@ -133,7 +161,6 @@
             }
             else
             {
-                // Po udanym przełączeniu wymuśmy pełne przeładowanie aplikacji
                 Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
             }
         }
@@ -145,6 +172,42 @@
         finally
         {
             isSubmitting = false;
+        }
+    }
+
+    private async Task OnSyncAsync()
+    {
+        isSyncing = true;
+        syncMessage = null;
+
+        try
+        {
+            var response = await Http.PostAsync("api/db/sync", null);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorDto = await response.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+                string serverMsg = (errorDto != null && errorDto.TryGetValue("error", out var err))
+                    ? err?.ToString() ?? "Nieznany błąd"
+                    : "Nieznany błąd";
+
+                await JS.InvokeVoidAsync("alert", $"Błąd podczas synchronizacji:\n{serverMsg}");
+            }
+            else
+            {
+                var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+                if (result != null && result.TryGetValue("message", out var msg))
+                {
+                    syncMessage = msg;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Wyjątek podczas synchronizacji:\n{ex.Message}");
+        }
+        finally
+        {
+            isSyncing = false;
         }
     }
 }

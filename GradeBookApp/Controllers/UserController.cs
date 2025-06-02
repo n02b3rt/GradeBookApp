@@ -6,24 +6,30 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;    // potrzebne dla ToListAsync()
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
+using GradeBookApp.Data.Entities;
+using GradeBookApp.Filters;
 
 namespace GradeBookApp.Api.Controllers
 {
     [Route("api/users")]
     [ApiController]
-    [Authorize(Roles = "Admin")]
+    [RequireRole("Admin")]
     public class UserController : ControllerBase
     {
         private readonly UserService _userService;
         private readonly RoleManager<IdentityRole> _roleManager;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public UserController(
             UserService userService,
-            RoleManager<IdentityRole> roleManager)
+            RoleManager<IdentityRole> roleManager,
+            UserManager<ApplicationUser> userManager)
         {
             _userService = userService;
             _roleManager = roleManager;
+            _userManager = userManager;
         }
 
         // GET: api/users
@@ -33,6 +39,34 @@ namespace GradeBookApp.Api.Controllers
             var users = await _userService.GetUsersAsync();
             return Ok(users);
         }
+        
+        [HttpGet("debug/roles")]
+        public IActionResult DebugRoles()
+        {
+            var roles = User.Claims
+                .Where(c => c.Type == ClaimTypes.Role)
+                .Select(c => c.Value)
+                .ToList();
+
+            return Ok(roles);
+        }
+
+        
+        // GET: api/users/count
+        [HttpGet("count")]
+        public async Task<IActionResult> GetStudentsCount()
+        {
+            const string studentRoleName = "Student";
+
+            if (!await _roleManager.RoleExistsAsync(studentRoleName))
+            {
+                return Ok(0);
+            }
+
+            var students = await _userManager.GetUsersInRoleAsync(studentRoleName);
+            return Ok(students.Count);
+        }
+
 
         // GET: api/users/{id}
         [HttpGet("{id}")]

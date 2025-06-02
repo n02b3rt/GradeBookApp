@@ -1,20 +1,270 @@
-﻿@page "/admin/dashboard"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard"
 @rendermode InteractiveServer
+
+@using System.Security.Claims
+@using System.Net.Http.Json
 @using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "Admin")]
 
+@inject HttpClient Http
+@inject NavigationManager NavMgr
+@inject IJSRuntime JS
+@inject AuthenticationStateProvider AuthStateProvider
 
-<h1>Admin Dashboard</h1>
+<div class="container py-4">
+    <div class="row mb-4">
+        <div class="col text-center">
+            <h3>Panel Administracyjny</h3>
+        </div>
+    </div>
 
-<p>@message</p>
+    <div class="alert alert-secondary">
+        <strong>Jesteś zalogowany jako:</strong> @userEmail <br />
+        <strong>Role:</strong> @string.Join(", ", userRoles)
+    </div>
 
-<button class="btn btn-primary" @onclick="OnClick">Kliknij mnie!</button>
+    @if (isLoading)
+    {
+        <div class="row mb-4">
+            <div class="col d-flex justify-content-center">
+                <div class="spinner-border text-primary me-2" role="status">
+                    <span class="visually-hidden">Ładuję…</span>
+                </div>
+                <span class="align-self-center">Ładuję dane…</span>
+            </div>
+        </div>
+    }
+    else if (loadError is not null)
+    {
+        <div class="row mb-4">
+            <div class="col">
+                <div class="alert alert-danger" role="alert">
+                    <strong>Błąd:</strong> @loadError
+                </div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <div class="row gx-3 gy-3 mb-4 justify-content-center">
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="card text-white @(useBackup ? "bg-secondary" : "bg-primary") h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Aktywna baza</h6>
+                        <h3 class="card-text">@(useBackup ? "Backup" : "Primary")</h3>
+                        <small>(@(useBackup ? "gradebookdb_backup" : "gradebookdb"))</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="card border-info h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Użytkownicy</h6>
+                        <h3 class="card-text">@totalUsers</h3>
+                        <small class="text-muted">Razem zarejestrowanych</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="card border-success h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Klasy</h6>
+                        <h3 class="card-text">@totalClasses</h3>
+                        <small class="text-muted">Aktywne klasy</small>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <div class="card border-warning h-100">
+                    <div class="card-body">
+                        <h6 class="card-title">Przedmioty</h6>
+                        <h3 class="card-text">@totalSubjects</h3>
+                        <small class="text-muted">Zdefiniowane przedmioty</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row gx-3 gy-3 mb-4 justify-content-center">
+            <div class="col-6 col-sm-4 col-md-3">
+                <button class="btn btn-outline-primary w-100" @onclick="NavigateToDbAdmin">
+                    <i class="bi bi-database-fill-lock me-2"></i>
+                    Przełącz bazę
+                </button>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <button class="btn btn-outline-warning w-100" @onclick="OnSyncAsync" disabled="@isSyncing">
+                    @if (isSyncing)
+                    {
+                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                        <span>Synchronizuję…</span>
+                    }
+                    else
+                    {
+                        <span><i class="bi bi-arrow-repeat me-2"></i>Synchronizuj</span>
+                    }
+                </button>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <button class="btn btn-outline-info w-100" @onclick="OnRefreshAsync">
+                    <i class="bi bi-arrow-clockwise me-2"></i>
+                    Odśwież dane
+                </button>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+                <button class="btn btn-outline-danger w-100" @onclick="OnLogout">
+                    <i class="bi bi-box-arrow-right me-2"></i>
+                    Wyloguj
+                </button>
+            </div>
+        </div>
+
+        @if (logLines?.Count > 0)
+        {
+            <div class="row mb-4">
+                <div class="col">
+                    <h6>Ostatnie wpisy z logów:</h6>
+                    <div class="border rounded p-3" style="height: 200px; overflow-y: auto; background-color: #f8f9fa;">
+                        @foreach (var line in logLines)
+                        {
+                            <div><small>@line</small></div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
 
 @code {
-    private string message = "Nie kliknięto";
+    private bool useBackup;
+    private int totalUsers;
+    private int totalClasses;
+    private int totalSubjects;
+    private bool isLoading = true;
+    private bool isSyncing = false;
+    private string? loadError;
+    private List<string>? logLines;
 
-    private void OnClick()
+    private string userEmail = "";
+    private List<string> userRoles = new();
+
+    protected override async Task OnInitializedAsync()
     {
-        message = "Kliknięto!";
+        await LoadDashboardDataAsync();
+
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        userEmail = user.Identity?.Name ?? "Brak";
+        userRoles = user.Claims
+            .Where(c => c.Type == ClaimTypes.Role || c.Type.EndsWith("/role"))
+            .Select(c => c.Value)
+            .ToList();
     }
+
+    private async Task LoadDashboardDataAsync()
+    {
+        isLoading = true;
+        loadError = null;
+
+        try
+        {
+            var statusResp = await Http.GetAsync("api/db/status");
+            if (statusResp.IsSuccessStatusCode)
+            {
+                var status = await statusResp.Content.ReadFromJsonAsync<StatusResponse>();
+                useBackup = status?.UseBackup ?? false;
+            }
+            else
+                throw new Exception($"Nie udało się pobrać statusu bazy: {(int)statusResp.StatusCode} {statusResp.ReasonPhrase}");
+
+            totalUsers = await FetchIntValueAsync("api/users/count");
+            totalClasses = await FetchIntValueAsync("api/classes/count");
+            totalSubjects = await FetchIntValueAsync("api/subjects/count");
+
+            var logsResp = await Http.GetAsync("api/logs/recent?limit=10");
+            logLines = logsResp.IsSuccessStatusCode
+                ? await logsResp.Content.ReadFromJsonAsync<List<string>>()
+                : new List<string>();
+        }
+        catch (Exception ex)
+        {
+            loadError = ex.Message;
+            Console.WriteLine($"[Dashboard] Błąd: {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task<int> FetchIntValueAsync(string url)
+    {
+        try
+        {
+            var resp = await Http.GetAsync(url);
+            return resp.IsSuccessStatusCode
+                ? await resp.Content.ReadFromJsonAsync<int>()
+                : 0;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private void NavigateToDbAdmin() => NavMgr.NavigateTo("/admin/db");
+
+    private async Task OnSyncAsync()
+    {
+        isSyncing = true;
+        try
+        {
+            var response = await Http.PostAsync("api/db/sync", null);
+            if (response.IsSuccessStatusCode)
+            {
+                await JS.InvokeVoidAsync("alert", "Synchronizacja zakończona pomyślnie.");
+                await LoadDashboardDataAsync();
+            }
+            else
+            {
+                var errorObj = await TryReadErrorAsync(response);
+                await JS.InvokeVoidAsync("alert", $"Błąd synchronizacji: {errorObj}");
+            }
+        }
+        catch (Exception ex)
+        {
+            await JS.InvokeVoidAsync("alert", $"Wyjątek: {ex.Message}");
+        }
+        finally
+        {
+            isSyncing = false;
+        }
+    }
+
+    private async Task OnRefreshAsync() => await LoadDashboardDataAsync();
+
+    private async Task OnLogout()
+    {
+        await Http.PostAsync("Identity/Account/Logout", null);
+        NavMgr.NavigateTo("/");
+    }
+
+    private async Task<string> TryReadErrorAsync(HttpResponseMessage resp)
+    {
+        try
+        {
+            var dto = await resp.Content.ReadFromJsonAsync<Dictionary<string, object>>();
+            return dto != null && dto.TryGetValue("error", out var err)
+                ? err?.ToString() ?? "Nieznany błąd"
+                : $"Kod {(int)resp.StatusCode}";
+        }
+        catch
+        {
+            return $"Kod {(int)resp.StatusCode}";
+        }
+    }
+
+    private class StatusResponse { public bool UseBackup { get; set; } }
 }

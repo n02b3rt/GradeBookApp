@@ -1,4 +1,6 @@
-﻿@page "/admin/dashboard/teacher-subjects"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/teacher-subjects"
+@using Microsoft.AspNetCore.Authorization
 @rendermode InteractiveServer
 @inject HttpClient Http
 

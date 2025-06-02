@@ -1,4 +1,6 @@
-﻿@page "/admin/dashboard/student-assign/{ClassId:int}"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/student-assign/{ClassId:int}"
+@using Microsoft.AspNetCore.Authorization
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation

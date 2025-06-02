@@ -1,9 +1,11 @@
-﻿@page "/admin/dashboard/subjects/edit/{Id}"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/subjects/edit/{Id}"
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 <div class="container">
     <h2 class="mb-4 fw-bold text-dark">✏️ Edytuj przedmiot</h2>

@@ -1,9 +1,11 @@
-﻿@page "/admin/dashboard/classes/edit/{ClassId:int}"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/classes/edit/{ClassId:int}"
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
 
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 
 <div class="container mt-4">
     <h2 class="mb-4 fw-bold text-dark">✏️ Edytuj klasę</h2>

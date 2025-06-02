@@ -1,7 +1,9 @@
-﻿@page "/admin/dashboard/users/edit/{UserId}"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/users/edit/{UserId}"
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 
 @inject UserService UserService
 @inject ClassService ClassService

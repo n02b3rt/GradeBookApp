@@ -2,6 +2,10 @@
 using GradeBookApp.Shared;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace GradeBookApp.Controllers;
 
@@ -16,6 +20,7 @@ public class SubjectsController : ControllerBase
         _subjectService = subjectService;
     }
 
+    // GET: api/subjects
     [HttpGet]
     public async Task<ActionResult<List<SubjectDto>>> GetAll()
     {
@@ -23,6 +28,16 @@ public class SubjectsController : ControllerBase
         return Ok(subjects);
     }
 
+    // GET: api/subjects/count
+    [HttpGet("count")]
+    public async Task<IActionResult> GetSubjectsCount()
+    {
+        var subjects = await _subjectService.GetSubjectsAsync();
+        int count = subjects?.Count ?? 0;
+        return Ok(count);
+    }
+
+    // GET: api/subjects/{id}
     [HttpGet("{id}")]
     public async Task<ActionResult<SubjectDto>> GetById(string id)
     {
@@ -31,6 +46,7 @@ public class SubjectsController : ControllerBase
         return Ok(subject);
     }
 
+    // POST: api/subjects
     [HttpPost]
     public async Task<ActionResult<SubjectDto>> Create([FromBody] SubjectDto dto)
     {
@@ -43,13 +59,13 @@ public class SubjectsController : ControllerBase
         {
             return BadRequest($"❗ {ex.Message}");
         }
-        catch (DbUpdateException dbEx)
+        catch (DbUpdateException)
         {
             return BadRequest("❗ Wystąpił błąd bazy danych – być może przedmiot już istnieje.");
         }
     }
 
-
+    // PUT: api/subjects/{id}
     [HttpPut("{id}")]
     public async Task<IActionResult> Update(string id, [FromBody] SubjectDto dto)
     {
@@ -68,6 +84,7 @@ public class SubjectsController : ControllerBase
         }
     }
 
+    // DELETE: api/subjects/{id}
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)
     {

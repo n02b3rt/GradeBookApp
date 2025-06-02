@@ -1,10 +1,12 @@
-﻿@page "/admin/dashboard/classes"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/classes"
 @rendermode InteractiveServer
 @inject HttpClient Http
 @inject NavigationManager Navigation
 @inject IJSRuntime JsRuntime
 
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 
 <div class="container py-4">
     <div class="d-flex justify-content-between align-items-center mb-4">

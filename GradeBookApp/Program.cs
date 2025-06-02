@@ -44,7 +44,7 @@ builder.Services.AddDbContextFactory<ApplicationDbContext>((sp, options) =>
 builder.Services.AddScoped<ApplicationDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
-// === 4. Identity
+// === 4. Identity (cookie-based auth)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;
@@ -57,12 +57,21 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// === 5. Twoje serwisy
+// === (opcjonalnie) konfiguracja ścieżek cookie auth
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.AccessDeniedPath = "/Account/AccessDenied";
+});
+
+// === 5.  serwisy
 builder.Services.AddScoped<ClassService>();
 builder.Services.AddScoped<SubjectService>();
 builder.Services.AddScoped<TeacherSubjectService>();
 builder.Services.AddScoped<StudentClassService>();
 builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<StudentDataService>();
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 builder.Services.AddRazorComponents()
@@ -72,18 +81,38 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CustomUserClaimsPrincipalFactory>();
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
-builder.Services.AddHttpClient();
-builder.Services.AddScoped(sp =>
+builder.Services.AddHttpContextAccessor();
+
+// === 6. HttpClient z cookies (jeśli coś wysyłasz lokalnie)
+builder.Services.AddScoped<HttpClient>(sp =>
 {
-    var nav = sp.GetRequiredService<NavigationManager>();
-    return new HttpClient { BaseAddress = new Uri(nav.BaseUri) };
+    var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
+    var handler = new HttpClientHandler();
+
+    if (httpContextAccessor.HttpContext?.Request?.Cookies != null)
+    {
+        handler.CookieContainer = new System.Net.CookieContainer();
+
+        foreach (var cookie in httpContextAccessor.HttpContext.Request.Cookies)
+        {
+            handler.CookieContainer.Add(new Uri("https://localhost:7264"), new System.Net.Cookie(cookie.Key, cookie.Value));
+        }
+
+        handler.UseCookies = true;
+    }
+
+    return new HttpClient(handler)
+    {
+        BaseAddress = new Uri("https://localhost:7264") // dopasuj, jeśli inny port
+    };
 });
 
 var app = builder.Build();
 
-// === 6. Middleware
+// === 7. Middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -97,18 +126,15 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseAuthentication();
+app.UseAuthentication(); // tylko Identity cookie
 app.UseAuthorization();
 app.UseAntiforgery();
 
-// Map kontrolerów przed Blazor:
 app.MapControllers();
-
-app.MapRazorComponents<App>()
-   .AddInteractiveServerRenderMode();
+app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapAdditionalIdentityEndpoints();
 
-// === 7. Migracje + seedy – BEZWZGLĘDNIE ZA KAŻDYM RAZEM, ale bez usuwania bazy ===
+// === 8. Migracje + seedy
 using (var scope = app.Services.CreateScope())
 {
     var ctxFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
@@ -118,9 +144,6 @@ using (var scope = app.Services.CreateScope())
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
     Console.WriteLine("[Program] Migrate (UNCONDITIONAL)");
-    // * Zakomentowane usuwanie bazy:
-    // Console.WriteLine("[Program] EnsureDeleted (UNCONDITIONAL)");
-    // await dbContext.Database.EnsureDeletedAsync();
     await dbContext.Database.MigrateAsync();
 
     Console.WriteLine("[Program] DbSeeder.SeedAsync (UNCONDITIONAL) start");

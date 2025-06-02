@@ -1,7 +1,9 @@
 ﻿using GradeBookApp.Shared;
 using GradeBookApp.Services;
 using Microsoft.AspNetCore.Mvc;
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace GradeBookApp.Controllers
@@ -17,6 +19,7 @@ namespace GradeBookApp.Controllers
             _classService = classService;
         }
 
+        // GET: api/classes
         [HttpGet]
         public async Task<ActionResult<List<ClassDto>>> GetClasses()
         {
@@ -24,6 +27,16 @@ namespace GradeBookApp.Controllers
             return Ok(classes);
         }
 
+        // GET: api/classes/count
+        [HttpGet("count")]
+        public async Task<IActionResult> GetClassesCount()
+        {
+            var classes = await _classService.GetClassesAsync();
+            int count = classes?.Count ?? 0;
+            return Ok(count);
+        }
+
+        // GET: api/classes/{id}
         [HttpGet("{id}")]
         public async Task<ActionResult<ClassDto?>> GetClass(int id)
         {
@@ -32,6 +45,7 @@ namespace GradeBookApp.Controllers
             return Ok(cls);
         }
 
+        // POST: api/classes
         [HttpPost]
         public async Task<ActionResult<ClassDto>> CreateClassAsync([FromBody] ClassDto newClassDto)
         {
@@ -46,6 +60,7 @@ namespace GradeBookApp.Controllers
             }
         }
 
+        // PUT: api/classes/{id}
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateClass(int id, [FromBody] ClassDto updatedClass)
         {
@@ -58,6 +73,7 @@ namespace GradeBookApp.Controllers
             return NoContent();
         }
 
+        // DELETE: api/classes/{id}
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteClass(int id)
         {
@@ -67,12 +83,12 @@ namespace GradeBookApp.Controllers
             return NoContent();
         }
         
+        // GET: api/classes/simple
         [HttpGet("simple")]
         public async Task<ActionResult<List<object>>> GetSimple()
         {
             var classes = await _classService.GetClassesAsync();
             return Ok(classes.Select(c => new { c.Id, c.Name }));
         }
-
     }
 }

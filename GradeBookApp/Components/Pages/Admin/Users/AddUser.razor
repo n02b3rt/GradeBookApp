@@ -1,7 +1,9 @@
-﻿@page "/admin/dashboard/users/add"
+﻿@attribute [Authorize(Roles = "Admin")]
+@page "/admin/dashboard/users/add"
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 @inject UserService UserService
 @inject NavigationManager NavigationManager
 @inject HttpClient Http

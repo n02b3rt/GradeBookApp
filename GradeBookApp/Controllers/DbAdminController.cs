@@ -35,11 +35,11 @@ namespace GradeBookApp.Api.Controllers
             _configuration = configuration;
             _dbSettingsMonitor = dbSettingsMonitor;
 
-            // Pobieramy connection stringi
+            // Pobierz connection stringi
             _primaryConn = _configuration.GetConnectionString("Primary")
                            ?? throw new InvalidOperationException("Brak connection string 'Primary'");
             _backupConn = _configuration.GetConnectionString("Backup")
-                          ?? throw new InvalidOperationException("Brak connection string 'Backup'");
+                           ?? throw new InvalidOperationException("Brak connection string 'Backup'");
 
             Console.WriteLine($"[DbAdminController] Konstruktor: PrimaryConn = {_primaryConn}");
             Console.WriteLine($"[DbAdminController] Konstruktor: BackupConn  = {_backupConn}");
@@ -62,102 +62,9 @@ namespace GradeBookApp.Api.Controllers
         }
 
         /// <summary>
-        /// POST api/db/sync
-        /// 1. Rozłącza istniejące sesje do bazy „backup" (jeśli są),
-        /// 2. Dropuje bazę „backup",
-        /// 3. Tworzy nową bazę „backup" jako TEMPLATE „primary",
-        /// 4. Czyści wszystkie pule połączeń Npgsql.
-        /// </summary>
-        [HttpPost("sync")]
-        public async Task<IActionResult> SyncBackup()
-        {
-            Console.WriteLine("[DbAdminController] SyncBackup: wywołane");
-            try
-            {
-                var primaryBuilder = new NpgsqlConnectionStringBuilder(_primaryConn);
-                var backupBuilder = new NpgsqlConnectionStringBuilder(_backupConn);
-
-                string primaryDbName = primaryBuilder.Database;
-                string backupDbName = backupBuilder.Database;
-
-                Console.WriteLine($"[DbAdminController] SyncBackup: primaryDbName = {primaryDbName}");
-                Console.WriteLine($"[DbAdminController] SyncBackup: backupDbName  = {backupDbName}");
-
-                // Połącz się do bazy „postgres" (aby móc DROP/CREATE)
-                var adminBuilder = new NpgsqlConnectionStringBuilder(_primaryConn)
-                {
-                    Database = "postgres"
-                };
-                Console.WriteLine($"[DbAdminController] SyncBackup: adminConn = {adminBuilder.ConnectionString}");
-
-                await using (var conn = new NpgsqlConnection(adminBuilder.ConnectionString))
-                {
-                    await conn.OpenAsync();
-                    Console.WriteLine("[DbAdminController] SyncBackup: Połączono do postgres");
-
-                    // 0) Rozłącz wszystkie sesje do Primary (żeby utworzyć TEMPLATE)
-                    string disconnectPrimarySql = $@"
-                        SELECT pg_terminate_backend(pid)
-                        FROM pg_stat_activity
-                        WHERE datname = '{primaryDbName}'
-                          AND pid <> pg_backend_pid();";
-                    Console.WriteLine($"[DbAdminController] SyncBackup: disconnectPrimarySql = {disconnectPrimarySql.Trim()}");
-                    await using (var cmdDiscP = new NpgsqlCommand(disconnectPrimarySql, conn))
-                    {
-                        int terminatedP = await cmdDiscP.ExecuteNonQueryAsync();
-                        Console.WriteLine($"[DbAdminController] SyncBackup: Rozłączono sesji w Primary: {terminatedP}");
-                    }
-
-                    // 1) Rozłącz wszystkie połączenia do backupDbName
-                    string disconnectBackupSql = $@"
-                        SELECT pg_terminate_backend(pid)
-                        FROM pg_stat_activity
-                        WHERE datname = '{backupDbName}'
-                          AND pid <> pg_backend_pid();";
-                    Console.WriteLine($"[DbAdminController] SyncBackup: disconnectBackupSql = {disconnectBackupSql.Trim()}");
-                    await using (var cmdDiscB = new NpgsqlCommand(disconnectBackupSql, conn))
-                    {
-                        int terminatedB = await cmdDiscB.ExecuteNonQueryAsync();
-                        Console.WriteLine($"[DbAdminController] SyncBackup: Rozłączono sesji w Backup: {terminatedB}");
-                    }
-
-                    // 2) DROP DATABASE IF EXISTS backupDbName
-                    string dropSql = $"DROP DATABASE IF EXISTS \"{backupDbName}\";";
-                    Console.WriteLine($"[DbAdminController] SyncBackup: dropSql = {dropSql}");
-                    await using (var cmdDrop = new NpgsqlCommand(dropSql, conn))
-                    {
-                        await cmdDrop.ExecuteNonQueryAsync();
-                        Console.WriteLine("[DbAdminController] SyncBackup: DROP wykonane");
-                    }
-
-                    // 3) CREATE DATABASE backupDbName TEMPLATE primaryDbName
-                    string createSql = $"CREATE DATABASE \"{backupDbName}\" TEMPLATE \"{primaryDbName}\";";
-                    Console.WriteLine($"[DbAdminController] SyncBackup: createSql = {createSql}");
-                    await using (var cmdCreate = new NpgsqlCommand(createSql, conn))
-                    {
-                        await cmdCreate.ExecuteNonQueryAsync();
-                        Console.WriteLine("[DbAdminController] SyncBackup: CREATE wykonane");
-                    }
-                }
-
-                // 4) Po DROP/CREATE czyścimy pule połączeń Npgsql
-                NpgsqlConnection.ClearAllPools();
-                Console.WriteLine("[DbAdminController] SyncBackup: Wyczyść puli połączeń Npgsql (ClearAllPools)");
-
-                Console.WriteLine("[DbAdminController] SyncBackup: zakończono pomyślnie");
-                return Ok(new { message = $"Backup '{backupDbName}' zsynchronizowany z '{primaryDbName}'." });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DbAdminController] SyncBackup: wyjątek = {ex}");
-                return BadRequest(new { error = ex.Message });
-            }
-        }
-
-        /// <summary>
         /// POST api/db/switch
         /// Ustawia wartość UseBackup = true/false w appsettings.json,
-        /// następnie przeładowuje konfigurację, czyści pule połączeń i KOŃCZY PROCES.
+        /// następnie przeładowuje konfigurację, czyści pule połączeń i kończy proces.
         /// </summary>
         [HttpPost("switch")]
         public IActionResult SwitchDatabase([FromBody] SwitchRequest request)
@@ -212,7 +119,7 @@ namespace GradeBookApp.Api.Controllers
                 NpgsqlConnection.ClearAllPools();
                 Console.WriteLine("[DbAdminController] SwitchDatabase: Npgsql.ClearAllPools() wykonane");
 
-                // 6. Zakończ proces, aby przy ponownym uruchomieniu wykonać migracje + seedy
+                // 6. Zakończ proces, aby przy kolejnym uruchomieniu wykonać migracje + seedy
                 Console.WriteLine("[DbAdminController] SwitchDatabase: zakończenie procesu (Environment.Exit)");
                 Environment.Exit(0);
 
@@ -222,6 +129,114 @@ namespace GradeBookApp.Api.Controllers
             catch (Exception ex)
             {
                 Console.WriteLine($"[DbAdminController] SwitchDatabase: wyjątek = {ex}");
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// POST api/db/sync
+        /// Synchronizuje bazę „aktywna” → „druga”:
+        /// - jeśli UseBackup = false, to Primary → Backup,
+        /// - jeśli UseBackup = true, to Backup → Primary.
+        ///
+        /// Kroki:
+        /// 1. Rozłącz wszystkie sesje do obu baz (żeby można było DROP/CREATE),
+        /// 2. DROP docelowej bazy,
+        /// 3. CREATE docelowej bazy jako TEMPLATE źródłowej,
+        /// 4. ClearAllPools().
+        /// </summary>
+        [HttpPost("sync")]
+        public async Task<IActionResult> SyncBasedOnSetting()
+        {
+            Console.WriteLine("[DbAdminController] SyncBasedOnSetting: wywołane");
+            bool useBackup = _dbSettingsMonitor.CurrentValue.UseBackup;
+            Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: UseBackup = {useBackup}");
+
+            // Która baza jest źródłowa, a która docelowa?
+            string sourceConn = useBackup ? _backupConn : _primaryConn;
+            string targetConn = useBackup ? _primaryConn : _backupConn;
+
+            var sourceBuilder = new NpgsqlConnectionStringBuilder(sourceConn);
+            var targetBuilder = new NpgsqlConnectionStringBuilder(targetConn);
+
+            string sourceDbName = sourceBuilder.Database;
+            string targetDbName = targetBuilder.Database;
+
+            Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: sourceDbName = {sourceDbName}");
+            Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: targetDbName = {targetDbName}");
+
+            try
+            {
+                // Połącz z „postgres” na dowolnej bazie (wykorzystamy sourceConn, ale ustawiamy Database = "postgres")
+                var adminBuilder = new NpgsqlConnectionStringBuilder(sourceConn)
+                {
+                    Database = "postgres"
+                };
+                Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: adminConn = {adminBuilder.ConnectionString}");
+
+                await using (var conn = new NpgsqlConnection(adminBuilder.ConnectionString))
+                {
+                    await conn.OpenAsync();
+                    Console.WriteLine("[DbAdminController] SyncBasedOnSetting: Połączono do postgres");
+
+                    // 1) Rozłącz sesje (!) do obu baz (source i target)
+                    string disconnectSourceSql = $@"
+                        SELECT pg_terminate_backend(pid)
+                        FROM pg_stat_activity
+                        WHERE datname = '{sourceDbName}'
+                          AND pid <> pg_backend_pid();";
+                    Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: disconnectSourceSql = {disconnectSourceSql.Trim()}");
+                    await using (var cmdDiscSrc = new NpgsqlCommand(disconnectSourceSql, conn))
+                    {
+                        int terminatedSrc = await cmdDiscSrc.ExecuteNonQueryAsync();
+                        Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: Rozłączono sesji w Source: {terminatedSrc}");
+                    }
+
+                    string disconnectTargetSql = $@"
+                        SELECT pg_terminate_backend(pid)
+                        FROM pg_stat_activity
+                        WHERE datname = '{targetDbName}'
+                          AND pid <> pg_backend_pid();";
+                    Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: disconnectTargetSql = {disconnectTargetSql.Trim()}");
+                    await using (var cmdDiscTgt = new NpgsqlCommand(disconnectTargetSql, conn))
+                    {
+                        int terminatedTgt = await cmdDiscTgt.ExecuteNonQueryAsync();
+                        Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: Rozłączono sesji w Target: {terminatedTgt}");
+                    }
+
+                    // 2) DROP DATABASE IF EXISTS targetDbName
+                    string dropSql = $"DROP DATABASE IF EXISTS \"{targetDbName}\";";
+                    Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: dropSql = {dropSql}");
+                    await using (var cmdDrop = new NpgsqlCommand(dropSql, conn))
+                    {
+                        await cmdDrop.ExecuteNonQueryAsync();
+                        Console.WriteLine("[DbAdminController] SyncBasedOnSetting: DROP wykonane");
+                    }
+
+                    // 3) CREATE DATABASE targetDbName TEMPLATE sourceDbName
+                    string createSql = $"CREATE DATABASE \"{targetDbName}\" TEMPLATE \"{sourceDbName}\";";
+                    Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: createSql = {createSql}");
+                    await using (var cmdCreate = new NpgsqlCommand(createSql, conn))
+                    {
+                        await cmdCreate.ExecuteNonQueryAsync();
+                        Console.WriteLine("[DbAdminController] SyncBasedOnSetting: CREATE wykonane");
+                    }
+                }
+
+                // 4) Wyczyść pule połączeń Npgsql
+                NpgsqlConnection.ClearAllPools();
+                Console.WriteLine("[DbAdminController] SyncBasedOnSetting: ClearAllPools wykonane");
+
+                return Ok(new
+                {
+                    message = useBackup
+                        ? $"Zsynchronizowano backup → primary: '{sourceDbName}' → '{targetDbName}'."
+                        : $"Zsynchronizowano primary → backup: '{sourceDbName}' → '{targetDbName}'."
+                });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[DbAdminController] SyncBasedOnSetting: wyjątek = {ex}");
                 return BadRequest(new { error = ex.Message });
             }
         }
