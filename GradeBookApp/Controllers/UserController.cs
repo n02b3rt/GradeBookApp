@@ -15,7 +15,7 @@ namespace GradeBookApp.Api.Controllers
 {
     [Route("api/users")]
     [ApiController]
-    [RequireRole("Admin")]
+    [RequireRole("Admin", "Teacher")]
     public class UserController : ControllerBase
     {
         private readonly UserService _userService;

@@ -200,48 +200,65 @@ namespace GradeBookApp.Data.Seed
             await db.SaveChangesAsync();
 
             // === 9. OCENY (Grades) ===
-            // Dodajemy każdemu uczniowi po ocenie z każdego przedmiotu (80 uczniów × 15 przedmiotów = 1200 ocen)
+            // Każdy uczeń dostaje od 3 do 8 ocen z każdego przedmiotu (losowo)
             var grades = new List<Grade>();
             var rng = new Random();
             foreach (var student in students)
             {
                 foreach (var subj in subjects)
                 {
-                    // Znajdź nauczyciela prowadzącego ten przedmiot w klasie ucznia
                     var teacherSubjectLink = teacherSubjects
                         .First(ts => ts.SubjectId == subj.Id && ts.ClassId == student.ClassId);
-                    grades.Add(new Grade
+
+                    int numberOfGrades = rng.Next(3, 9); // 3–8 ocen
+
+                    for (int i = 0; i < numberOfGrades; i++)
                     {
-                        StudentId = student.Id,
-                        TeacherId = teacherSubjectLink.TeacherId,
-                        SubjectId = subj.Id,
-                        Value = rng.Next(2, 7), // losowo od 2 do 6
-                        Description = $"Ocena z {subj.Name}",
-                        Weight = rng.Next(1, 4), // losowo waga 1–3
-                        DateGiven = DateTime.UtcNow.AddDays(-rng.Next(0, 30)) // losowa data w ciągu ostatnich 30 dni
-                    });
+                        grades.Add(new Grade
+                        {
+                            StudentId = student.Id,
+                            TeacherId = teacherSubjectLink.TeacherId,
+                            SubjectId = subj.Id,
+                            Value = rng.Next(2, 7), // 2–6
+                            Weight = rng.Next(1, 4), // 1–3
+                            Description = $"Ocena {i + 1} z {subj.Name}",
+                            DateGiven = DateTime.UtcNow.AddDays(-rng.Next(0, 60)) // ostatnie 60 dni
+                        });
+                    }
                 }
             }
             db.Grades.AddRange(grades);
             await db.SaveChangesAsync();
 
             // === 10. OBECNOŚCI (Attendance) ===
-            // Dodajemy dla każdego ucznia po jednym wpisie obecności na każdy przedmiot na dzisiejszą datę
+// Dla każdej klasy i przedmiotu przypisz obecność dla WSZYSTKICH uczniów w klasie z tą samą datą
+
             var attendances = new List<Attendance>();
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            foreach (var student in students)
+            var recentDays = Enumerable.Range(1, 14).ToList(); // Ostatnie 14 dni
+
+            foreach (var cls in classes)
             {
+                var classStudents = students.Where(s => s.ClassId == cls.Id).ToList();
+
                 foreach (var subj in subjects)
                 {
-                    attendances.Add(new Attendance
+                    // Losuj datę z ostatnich 14 dni
+                    var randomDate = DateOnly.FromDateTime(DateTime.Today.AddDays(-rng.Next(recentDays.Count)));
+
+                    foreach (var student in classStudents)
                     {
-                        StudentId = student.Id,
-                        SubjectId = subj.Id,
-                        Date = today,
-                        Status = "Obecny"
-                    });
+                        var status = rng.NextDouble() < 0.85 ? "Obecny" : "Nieobecny"; // 85% obecnych
+                        attendances.Add(new Attendance
+                        {
+                            StudentId = student.Id,
+                            SubjectId = subj.Id,
+                            Date = randomDate,
+                            Status = status
+                        });
+                    }
                 }
             }
+
             db.Attendances.AddRange(attendances);
             await db.SaveChangesAsync();
         }
