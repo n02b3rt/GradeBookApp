@@ -2,13 +2,15 @@
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 @inject TeacherActionsService TeacherService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
+@attribute [Authorize(Roles = "Teacher")]
 
 <div class="container mt-4">
-    <h2 class="mb-4" style="color: #f39c12;">Add Grades to Class</h2>
-    <p><strong>Class ID:</strong> @ClassId | <strong>Subject:</strong> @SubjectId</p>
+    <h2 class="mb-4" style="color: #f39c12;">Dodaj oceny dla klasy</h2>
+    <p><strong>ID klasy:</strong> @ClassId | <strong>Przedmiot:</strong> @SubjectId</p>
 
     <EditForm Model="formModel" OnValidSubmit="SaveGrades">
         <DataAnnotationsValidator />
@@ -16,44 +18,45 @@
 
         <div class="mb-3 row">
             <div class="col-md-2">
-                <label class="form-label">Weight</label>
+                <label class="form-label">Waga</label>
                 <InputNumber class="form-control" @bind-Value="formModel.GlobalWeight" min="1" max="10" />
             </div>
             <div class="col-md-10">
-                <label class="form-label">Description</label>
+                <label class="form-label">Opis</label>
                 <InputText class="form-control" @bind-Value="formModel.GlobalDescription" />
             </div>
         </div>
 
         <table class="table table-bordered table-hover">
             <thead class="table-warning">
-                <tr>
-                    <th>#</th>
-                    <th>Full Name</th>
-                    <th>User ID</th>
-                    <th>Grade</th>
-                </tr>
+            <tr>
+                <th>#</th>
+                <th>Imię i nazwisko</th>
+                <th>ID użytkownika</th>
+                <th>Ocena</th>
+            </tr>
             </thead>
             <tbody>
-                @foreach (var (entry, index) in formModel.GradeList.Select((g, i) => (g, i + 1)))
-                {
-                    <tr>
-                        <td>@index</td>
-                        <td>@entry.StudentName</td>
-                        <td><code>@entry.StudentId</code></td>
-                        <td>
-                            <InputNumber class="form-control" @bind-Value="entry.Value" min="0" max="6" />
-                        </td>
-                    </tr>
-                }
+            @foreach (var (entry, index) in formModel.GradeList.Select((g, i) => (g, i + 1)))
+            {
+                <tr>
+                    <td>@index</td>
+                    <td>@entry.StudentName</td>
+                    <td><code>@entry.StudentId</code></td>
+                    <td>
+                        <InputNumber class="form-control" @bind-Value="entry.Value" min="0" max="6" />
+                    </td>
+                </tr>
+            }
             </tbody>
         </table>
 
         <button class="btn btn-success mt-3">
-            <i class="bi bi-check-circle"></i> Submit Grades
+            <i class="bi bi-check-circle"></i> Zatwierdź oceny
         </button>
     </EditForm>
 </div>
+
 
 @code {
     [Parameter] public int ClassId { get; set; }

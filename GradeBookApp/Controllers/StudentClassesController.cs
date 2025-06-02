@@ -3,9 +3,11 @@ using GradeBookApp.Shared;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using GradeBookApp.Filters;
 
 namespace GradeBookApp.Controllers;
 
+[RequireRole("Admin", "Student")]
 [ApiController]
 [Route("api/[controller]")]
 public class StudentClassesController : ControllerBase

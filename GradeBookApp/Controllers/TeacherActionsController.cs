@@ -1,10 +1,13 @@
 ﻿// Controllers/TeacherActionsController.cs
+
+using GradeBookApp.Filters;
 using GradeBookApp.Shared;
 using GradeBookApp.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GradeBookApp.Controllers;
 
+[RequireRole("Admin", "Teacher")]
 [ApiController]
 [Route("api/teacher")]
 public class TeacherActionsController : ControllerBase

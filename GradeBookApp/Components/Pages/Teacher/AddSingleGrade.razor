@@ -2,56 +2,61 @@
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 @inject TeacherActionsService TeacherService
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 @inject HttpClient Http
+@attribute [Authorize(Roles = "Teacher")]
 
-<h3 class="mt-4 mb-3" style="color: #f39c12;">Add Grade</h3>
+<div class="container">
+    <h3 class="mt-4 mb-3" style="color: #f39c12;">Dodaj ocenę</h3>
 
-@if (loading)
-{
-    <p><em>Loading student info...</em></p>
-}
-else if (student == null)
-{
-    <div class="alert alert-danger">Student not found.</div>
-}
-else
-{
-    <div class="card shadow p-3 mb-4">
-        <div class="card-body">
-            <h5>Student: <strong>@student.FirstName @student.LastName</strong></h5>
+    @if (loading)
+    {
+        <p><em>Ładowanie danych ucznia...</em></p>
+    }
+    else if (student == null)
+    {
+        <div class="alert alert-danger">Nie znaleziono ucznia.</div>
+    }
+    else
+    {
+        <div class="card shadow p-3 mb-4">
+            <div class="card-body">
+                <h5>Uczeń: <strong>@student.FirstName @student.LastName</strong></h5>
 
-            <EditForm Model="@gradeModel" OnValidSubmit="@HandleValidSubmit" FormName="AddGradeForm">
-                <DataAnnotationsValidator />
-                <ValidationSummary />
+                <EditForm Model="@gradeModel" OnValidSubmit="@HandleValidSubmit" FormName="AddGradeForm">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
 
-                <div class="mb-3">
-                    <label class="form-label">Grade Value</label>
-                    <InputNumber @bind-Value="gradeModel.Value" class="form-control" />
-                    <ValidationMessage For="@(() => gradeModel.Value)" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Wartość oceny</label>
+                        <InputNumber @bind-Value="gradeModel.Value" class="form-control" />
+                        <ValidationMessage For="@(() => gradeModel.Value)" />
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Weight</label>
-                    <InputNumber @bind-Value="gradeModel.Weight" class="form-control" />
-                    <ValidationMessage For="@(() => gradeModel.Weight)" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Waga</label>
+                        <InputNumber @bind-Value="gradeModel.Weight" class="form-control" />
+                        <ValidationMessage For="@(() => gradeModel.Weight)" />
+                    </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Description</label>
-                    <InputText @bind-Value="gradeModel.Description" class="form-control" />
-                    <ValidationMessage For="@(() => gradeModel.Description)" />
-                </div>
+                    <div class="mb-3">
+                        <label class="form-label">Opis</label>
+                        <InputText @bind-Value="gradeModel.Description" class="form-control" />
+                        <ValidationMessage For="@(() => gradeModel.Description)" />
+                    </div>
 
-                <button type="submit" class="btn btn-primary">
-                    <i class="bi bi-check-circle"></i> Submit Grade
-                </button>
-            </EditForm>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Zatwierdź ocenę
+                    </button>
+                </EditForm>
+            </div>
         </div>
-    </div>
-}
+    }
+</div>
+
 
 @code {
     [Parameter] public string StudentId { get; set; } = string.Empty;

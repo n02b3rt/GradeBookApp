@@ -6,9 +6,11 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using GradeBookApp.Filters;
 
 namespace GradeBookApp.Controllers;
 
+[RequireRole("Admin", "Teacher")]
 [ApiController]
 [Route("api/subjects")]
 public class SubjectsController : ControllerBase

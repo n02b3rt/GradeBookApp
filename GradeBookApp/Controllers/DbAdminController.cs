@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text.Json;
 using System.Threading.Tasks;
+using GradeBookApp.Filters;
 
 namespace GradeBookApp.Api.Controllers
 {
@@ -17,6 +18,7 @@ namespace GradeBookApp.Api.Controllers
         public bool UseBackup { get; set; }
     }
 
+    [RequireRole("Admin")]
     [ApiController]
     [Route("api/db")]
     public class DbAdminController : ControllerBase

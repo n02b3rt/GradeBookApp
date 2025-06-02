@@ -9,50 +9,51 @@
 
 <div class="container mt-4">
     <h1 class="mb-3" style="color: #f39c12;">
-        <i class="bi bi-person-lines-fill"></i> Teacher Dashboard
+        <i class="bi bi-person-lines-fill"></i> Panel Nauczyciela
     </h1>
-    <p class="lead">Welcome, Teacher! Below are your assigned classes.</p>
+    <p class="lead">Witaj, Nauczycielu! Poniżej znajdują się Twoje przypisane klasy.</p>
 
     @if (loading)
     {
-        <div class="alert alert-info">Loading your classes...</div>
+        <div class="alert alert-info">Ładowanie Twoich klas...</div>
     }
     else if (classes is null || !classes.Any())
     {
-        <div class="alert alert-warning">You are not assigned to any classes.</div>
+        <div class="alert alert-warning">Nie jesteś przypisany do żadnych klas.</div>
     }
     else
     {
         <div class="table-responsive">
             <table class="table table-hover table-bordered border-warning">
                 <thead style="background-color: #f39c12; color: white;">
-                    <tr>
-                        <th>#</th>
-                        <th>Class Name</th>
-                        <th>Year</th>
-                        <th>Action</th>
-                    </tr>
+                <tr>
+                    <th>#</th>
+                    <th>Nazwa klasy</th>
+                    <th>Rok</th>
+                    <th>Akcja</th>
+                </tr>
                 </thead>
                 <tbody>
-                    @foreach (var cls in classes.Select((c, i) => new { Class = c, Index = i + 1 }))
-                    {
-                        <tr>
-                            <td>@cls.Index</td>
-                            <td>@cls.Class.Name</td>
-                            <td>@cls.Class.Year</td>
-                            <td>
-                                <a class="btn btn-sm text-white" style="background-color: #f39c12;" 
-                                   href="/teacher/class/@cls.Class.Id/students">
-                                    <i class="bi bi-eye-fill"></i> View Class
-                                </a>
-                            </td>
-                        </tr>
-                    }
+                @foreach (var cls in classes.Select((c, i) => new { Class = c, Index = i + 1 }))
+                {
+                    <tr>
+                        <td>@cls.Index</td>
+                        <td>@cls.Class.Name</td>
+                        <td>@cls.Class.Year</td>
+                        <td>
+                            <a class="btn btn-sm text-white" style="background-color: #f39c12;"
+                               href="/teacher/class/@cls.Class.Id/students">
+                                <i class="bi bi-eye-fill"></i> Zobacz klasę
+                            </a>
+                        </td>
+                    </tr>
+                }
                 </tbody>
             </table>
         </div>
     }
 </div>
+
 
 @code {
     private List<ClassDto>? classes;

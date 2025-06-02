@@ -8,15 +8,15 @@
 
 <div class="container mt-4">
     <h2 class="mb-3" style="color: #f39c12;">
-        <i class="bi bi-people-fill"></i> Students in Class <strong>@ClassName</strong>
+        <i class="bi bi-people-fill"></i> Uczniowie w klasie <strong>@ClassName</strong>
     </h2>
 
     <div class="mb-3 d-flex gap-2">
         <button class="btn btn-outline-primary" @onclick="@(() => Navigation.NavigateTo($"/teacher/grades/class/{ClassId}/add/{SubjectId}"))">
-            <i class="bi bi-plus-circle"></i> Add Grades to Entire Class
+            <i class="bi bi-plus-circle"></i> Dodaj oceny całej klasie
         </button>
         <button class="btn btn-outline-secondary" @onclick="@(() => Navigation.NavigateTo($"/teacher/attendance/{ClassId}/{SubjectId}"))">
-            <i class="bi bi-calendar-check"></i> Check Attendance
+            <i class="bi bi-calendar-check"></i> Sprawdź obecność
         </button>
         <button class="btn btn-outline-info" @onclick="@(() => Navigation.NavigateTo($"/teacher/attendance/class/{ClassId}/{SubjectId}"))">
             <i class="bi bi-eye"></i> Zobacz obecności
@@ -25,11 +25,11 @@
 
     @if (loading)
     {
-        <div class="alert alert-info">Loading students and grades...</div>
+        <div class="alert alert-info">Ładowanie uczniów i ocen...</div>
     }
     else if (students == null || !students.Any())
     {
-        <div class="alert alert-warning">No students found.</div>
+        <div class="alert alert-warning">Nie znaleziono uczniów.</div>
     }
     else
     {
@@ -37,11 +37,11 @@
             <thead style="background-color: #f39c12; color: white;">
             <tr>
                 <th>#</th>
-                <th>Full Name</th>
+                <th>Imię i nazwisko</th>
                 <th>E-mail</th>
-                <th>Grades</th>
-                <th>Average</th>
-                <th>Actions</th>
+                <th>Oceny</th>
+                <th>Średnia</th>
+                <th>Akcje</th>
             </tr>
             </thead>
             <tbody>
@@ -58,7 +58,7 @@
                             {
                                 <span class="badge rounded-pill text-white me-1 mb-1"
                                       style="background-color: #f39c12; cursor: pointer;"
-                                      title="@($"Value: {grade.Value}, Weight: {grade.Weight}, Desc: {grade.Description}, Date: {grade.DateGiven:yyyy-MM-dd}")"
+                                      title="@($"Wartość: {grade.Value}, Waga: {grade.Weight}, Opis: {grade.Description}, Data: {grade.DateGiven:yyyy-MM-dd}")"
                                       @onclick="() => ShowGradeModal(grade)">
                                     @grade.Value
                                 </span>
@@ -66,7 +66,7 @@
                         }
                         else
                         {
-                            <span class="text-muted">No grades</span>
+                            <span class="text-muted">Brak ocen</span>
                         }
                     </td>
                     <td>
@@ -85,7 +85,7 @@
                     <td>
                         <a class="btn btn-sm btn-success"
                            href="/teacher/grades/add/@student.Id/@SubjectId">
-                            <i class="bi bi-plus-circle"></i> Add Grade
+                            <i class="bi bi-plus-circle"></i> Dodaj ocenę
                         </a>
                     </td>
                 </tr>
@@ -123,6 +123,7 @@
         </div>
     }
 </div>
+
 
 @code {
     [Parameter] public int ClassId { get; set; }

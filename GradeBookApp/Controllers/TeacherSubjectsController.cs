@@ -1,9 +1,11 @@
 ﻿using GradeBookApp.Data.Entities;
+using GradeBookApp.Filters;
 using GradeBookApp.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace GradeBookApp.Controllers;
 
+[RequireRole("Admin", "Teacher")]
 [ApiController]
 [Route("api/[controller]")]
 public class TeacherSubjectsController : ControllerBase

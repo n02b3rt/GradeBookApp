@@ -2,7 +2,9 @@
 @rendermode InteractiveServer
 @using GradeBookApp.Services
 @using GradeBookApp.Shared
+@using Microsoft.AspNetCore.Authorization
 @inject TeacherActionsService TeacherService
+@attribute [Authorize(Roles = "Teacher")]
 
 <div class="container mt-4">
     <h2 class="mb-4" style="color: #3498db;">Sprawdź obecność</h2>
