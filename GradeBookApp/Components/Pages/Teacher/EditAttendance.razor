@@ -1,0 +1,112 @@
+﻿@page "/teacher/attendance/edit/{ClassId:int}/{SubjectId}/{Date:datetime}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject NavigationManager Navigation
+
+<div class="container mt-4">
+    <h2 class="mb-4" style="color: #3498db;">Edytuj obecność</h2>
+    <p>
+        <strong>Klasa:</strong> @ClassId |
+        <strong>Przedmiot:</strong> @SubjectId |
+        <strong>Data:</strong> @Date.ToString("yyyy-MM-dd")
+    </p>
+
+    @if (attendanceList.Any())
+    {
+        <EditForm Model="attendanceList" OnValidSubmit="SaveAttendance">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+
+            <table class="table table-bordered table-hover">
+                <thead class="table-info">
+                    <tr>
+                        <th>#</th>
+                        <th>Imię i nazwisko</th>
+                        <th>ID ucznia</th>
+                        <th>Obecny</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var (record, index) in attendanceList.Select((a, i) => (a, i + 1)))
+                    {
+                        <tr>
+                            <td>@index</td>
+                            <td>@(studentMap.TryGetValue(record.StudentId, out var fullName) ? fullName : record.StudentId)</td>
+                            <td><code>@record.StudentId</code></td>
+                            <td class="text-center">
+                                <InputCheckbox @bind-Value="record.IsPresent" />
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+
+            <button type="submit" class="btn btn-primary mt-3">
+                <i class="bi bi-floppy"></i> Zapisz zmiany
+            </button>
+        </EditForm>
+    }
+    else
+    {
+        <div class="alert alert-warning">Brak obecności do edycji.</div>
+    }
+</div>
+
+@code {
+    [Parameter] public int ClassId { get; set; }
+    [Parameter] public string SubjectId { get; set; } = "";
+    [Parameter] public DateTime Date { get; set; }
+
+    private List<EditableAttendanceRecord> attendanceList = new();
+    private Dictionary<string, string> studentMap = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var dateOnly = DateOnly.FromDateTime(Date);
+
+        var students = await TeacherService.GetStudentsInClassAsync(ClassId);
+        studentMap = students.ToDictionary(s => s.Id, s => $"{s.FirstName} {s.LastName}");
+
+        var existing = await TeacherService.GetAttendanceForClassAndSubjectAsync(ClassId, SubjectId);
+
+        var forDate = existing
+            .Where(a => a.Date == dateOnly)
+            .ToList();
+
+        attendanceList = forDate.Select(a => new EditableAttendanceRecord
+        {
+            Id = a.Id,
+            StudentId = a.StudentId,
+            SubjectId = a.SubjectId,
+            Date = a.Date,
+            IsPresent = a.Status == "Obecny"
+        }).ToList();
+    }
+
+    private async Task SaveAttendance()
+    {
+        var updated = attendanceList.Select(a => new AttendanceDto
+        {
+            Id = a.Id,
+            StudentId = a.StudentId,
+            SubjectId = a.SubjectId,
+            Date = a.Date,
+            Status = a.IsPresent ? "Obecny" : "Nieobecny"
+        }).ToList();
+
+        await TeacherService.UpdateAttendanceBulkAsync(updated);
+
+        Navigation.NavigateTo($"/teacher/attendance/class/{ClassId}/{SubjectId}");
+    }
+
+    private class EditableAttendanceRecord
+    {
+        public int Id { get; set; }
+        public string StudentId { get; set; } = "";
+        public string SubjectId { get; set; } = "";
+        public DateOnly Date { get; set; }
+        public bool IsPresent { get; set; }
+    }
+}

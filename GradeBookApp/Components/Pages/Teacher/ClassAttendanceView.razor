@@ -1,0 +1,102 @@
+﻿@page "/teacher/attendance/class/{ClassId:int}/{SubjectId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+@inject NavigationManager NavigationManager
+
+<div class="container mt-4">
+    <h2 class="mb-4 text-primary">Przegląd Obecności</h2>
+    <p><strong>Klasa:</strong> @ClassId | <strong>Przedmiot:</strong> @SubjectId</p>
+
+    @if (groupedAttendance.Any())
+    {
+        <div class="accordion" id="attendanceAccordion">
+            @foreach (var (groupKey, groupValues, index) in groupedAttendance.Select((g, i) => (g.Key, g.Value, i)))
+            {
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading-@index">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <button class="accordion-button collapsed" type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#collapse-@index"
+                                    aria-expanded="false"
+                                    aria-controls="collapse-@index">
+                                Data: <strong class="ms-2">@groupKey.ToString("yyyy-MM-dd")</strong>
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary me-3"
+                                    @onclick="() => EditAttendance(groupKey)">
+                                <i class="bi bi-pencil-square"></i> Edytuj
+                            </button>
+                        </div>
+                    </h2>
+                    <div id="collapse-@index" class="accordion-collapse collapse"
+                         aria-labelledby="heading-@index"
+                         data-bs-parent="#attendanceAccordion">
+                        <div class="accordion-body">
+                            <table class="table table-sm table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>Imię i nazwisko</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var (record, idx) in groupValues.Select((r, i) => (r, i + 1)))
+                                    {
+                                        <tr>
+                                            <td>@idx</td>
+                                            <td>@(studentMap.TryGetValue(record.StudentId, out var fullName) ? fullName : record.StudentId)</td>
+                                            <td>
+                                                @if (record.Status == "Obecny")
+                                                {
+                                                    <span class="badge bg-success">Obecny</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="badge bg-danger">Nieobecny</span>
+                                                }
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-warning">Brak zapisanych obecności.</div>
+    }
+</div>
+
+@code {
+    [Parameter] public int ClassId { get; set; }
+    [Parameter] public string SubjectId { get; set; } = string.Empty;
+
+    private Dictionary<DateOnly, List<AttendanceDto>> groupedAttendance = new();
+    private Dictionary<string, string> studentMap = new(); // studentId -> "Imię Nazwisko"
+
+    protected override async Task OnInitializedAsync()
+    {
+        var raw = await TeacherService.GetAttendanceForClassAndSubjectAsync(ClassId, SubjectId);
+
+        var students = await TeacherService.GetStudentsInClassAsync(ClassId);
+        studentMap = students.ToDictionary(s => s.Id, s => $"{s.FirstName} {s.LastName}");
+
+        groupedAttendance = raw
+            .GroupBy(r => r.Date)
+            .OrderByDescending(g => g.Key)
+            .ToDictionary(g => g.Key, g => g.ToList());
+    }
+
+    private void EditAttendance(DateOnly date)
+    {
+        var formatted = date.ToString("yyyy-MM-dd");
+        NavigationManager.NavigateTo($"/teacher/attendance/edit/{ClassId}/{SubjectId}/{formatted}");
+    }
+}

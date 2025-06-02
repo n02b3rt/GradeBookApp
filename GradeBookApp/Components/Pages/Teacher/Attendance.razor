@@ -1,0 +1,86 @@
+﻿@page "/teacher/attendance/{ClassId:int}/{SubjectId}"
+@rendermode InteractiveServer
+@using GradeBookApp.Services
+@using GradeBookApp.Shared
+@inject TeacherActionsService TeacherService
+
+<div class="container mt-4">
+    <h2 class="mb-4" style="color: #3498db;">Sprawdź obecność</h2>
+    <p><strong>Klasa:</strong> @ClassId | <strong>Przedmiot:</strong> @SubjectId</p>
+
+    <EditForm Model="attendanceList" OnValidSubmit="SaveAttendance">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <table class="table table-bordered table-hover">
+            <thead class="table-info">
+            <tr>
+                <th>#</th>
+                <th>Imię i nazwisko</th>
+                <th>ID ucznia</th>
+                <th>Obecny</th>
+            </tr>
+            </thead>
+            <tbody>
+            @foreach (var (record, index) in attendanceList.Select((a, i) => (a, i + 1)))
+            {
+                <tr>
+                    <td>@index</td>
+                    <td>@record.FullName</td>
+                    <td><code>@record.StudentId</code></td>
+                    <td class="text-center">
+                        <InputCheckbox @bind-Value="record.IsPresent" />
+                    </td>
+                </tr>
+            }
+            </tbody>
+        </table>
+
+        <button type="submit" class="btn btn-primary mt-3">
+            <i class="bi bi-check2-square"></i> Zapisz obecność
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter] public int ClassId { get; set; }
+    [Parameter] public string SubjectId { get; set; } = "";
+
+    private List<AttendanceRecord> attendanceList = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var students = await TeacherService.GetStudentsInClassAsync(ClassId);
+
+        attendanceList = students.Select(s => new AttendanceRecord
+        {
+            StudentId = s.Id,
+            FullName = $"{s.FirstName} {s.LastName}",
+            SubjectId = SubjectId,
+            Date = DateOnly.FromDateTime(DateTime.Today),
+            IsPresent = true
+        }).ToList();
+    }
+
+    private async Task SaveAttendance()
+    {
+        var toSave = attendanceList.Select(a => new AttendanceDto
+        {
+            StudentId = a.StudentId,
+            SubjectId = a.SubjectId,
+            Date = a.Date,
+            Status = a.IsPresent ? "Obecny" : "Nieobecny"
+        }).ToList();
+
+        await TeacherService.SaveAttendanceBulkAsync(toSave);
+    }
+
+    private class AttendanceRecord
+    {
+        public string StudentId { get; set; } = "";
+        public string FullName { get; set; } = "";
+        public string SubjectId { get; set; } = "";
+        public DateOnly Date { get; set; }
+        public bool IsPresent { get; set; } = true;
+    }
+}
