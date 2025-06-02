@@ -59,9 +59,33 @@
 
     [SupplyParameterFromForm] private InputModel Input { get; set; } = new();
 
+    [Inject] public AuthenticationStateProvider AuthStateProvider { get; set; } = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            var appUser = await UserManager.GetUserAsync(user);
+            if (appUser is not null)
+            {
+                var roles = await UserManager.GetRolesAsync(appUser);
+                if (roles.Contains("Admin"))
+                    NavigationManager.NavigateTo("/admin/dashboard");
+                else if (roles.Contains("Teacher"))
+                    NavigationManager.NavigateTo("/teacher/dashboard");
+                else if (roles.Contains("Student"))
+                    NavigationManager.NavigateTo("/student/dashboard");
+                else
+                    NavigationManager.NavigateTo("/");
+            }
+        }
+    }
+
     public async Task LoginUser()
     {
-        // Najpierw szukasz użytkownika po Email
         var user = await UserManager.FindByEmailAsync(Input.Email);
         if (user == null)
         {
@@ -69,16 +93,13 @@
             return;
         }
 
-        // Teraz wywołujesz logowanie podając UserName użytkownika
         var result = await SignInManager.PasswordSignInAsync(user.UserName, Input.Password, Input.RememberMe, lockoutOnFailure: false);
 
         if (result.Succeeded)
         {
             Logger.LogInformation("User logged in.");
-
             var roles = await UserManager.GetRolesAsync(user);
 
-            // Przekierowanie wg ról
             if (roles.Contains("Admin"))
                 NavigationManager.NavigateTo("/admin/dashboard");
             else if (roles.Contains("Teacher"))
@@ -102,7 +123,6 @@
             errorMessage = "Nieprawidłowa próba logowania.";
         }
     }
-
 
     private sealed class InputModel
     {

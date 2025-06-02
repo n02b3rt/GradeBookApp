@@ -1,8 +1,12 @@
 ﻿@namespace GradeBookApp.Components.Layout
+@rendermode InteractiveServer
 
 @using System.Security.Claims
+@using GradeBookApp.Data.Entities
+@using Microsoft.AspNetCore.Identity
 @inject AuthenticationStateProvider AuthStateProvider
 @inject NavigationManager NavigationManager
+@inject SignInManager<ApplicationUser> SignInManager
 
 @if (user.Identity?.IsAuthenticated ?? false)
 {
@@ -39,7 +43,6 @@
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><a class="dropdown-item" href="/teacher/dashboard">Dashboard</a></li>
-                                <li><a class="dropdown-item" href="/teacher/classes">Moje klasy</a></li>
                             </ul>
                         </li>
                     }
@@ -77,8 +80,9 @@
         user = authState.User;
     }
 
-    private async Task Logout()
+    private void Logout()
     {
         NavigationManager.NavigateTo("/account/logout", forceLoad: true);
     }
+
 }
