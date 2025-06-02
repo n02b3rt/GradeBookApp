@@ -84,7 +84,9 @@ builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 builder.Services.AddScoped<IUserClaimsPrincipalFactory<ApplicationUser>, CustomUserClaimsPrincipalFactory>();
 builder.Services.AddRazorPages();
-builder.Services.AddServerSideBlazor();
+builder.Services.AddServerSideBlazor()
+    .AddCircuitOptions(options => { options.DetailedErrors = true; });
+
 builder.Services.AddHttpContextAccessor();
 
 // === 6. HttpClient z cookies (jeśli coś wysyłasz lokalnie)
@@ -151,6 +153,29 @@ using (var scope = app.Services.CreateScope())
     await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
     Console.WriteLine("[Program] DbSeeder.SeedAsync (UNCONDITIONAL) end");
 }
+
+// === 8. Migracje + Seedy (Z CZYSZCZENIEM BAZY)
+// using (var scope = app.Services.CreateScope())
+// {
+//     var ctxFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
+//     await using var dbContext = ctxFactory.CreateDbContext();
+//
+//     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
+//     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+//
+//     Console.WriteLine("[Program] ❗ Czyszczenie bazy danych...");
+//     await dbContext.Database.EnsureDeletedAsync(); // <--- CZYŚCIMY
+//     Console.WriteLine("[Program] ✔ Baza usunięta.");
+//
+//     Console.WriteLine("[Program] 🛠 Wykonywanie migracji...");
+//     await dbContext.Database.MigrateAsync();
+//     Console.WriteLine("[Program] ✔ Migracje zastosowane.");
+//
+//     Console.WriteLine("[Program] 🌱 Seed danych (start)...");
+//     await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
+//     Console.WriteLine("[Program] 🌱 Seed danych (koniec).");
+// }
+
 
 Console.WriteLine("[Program] Uruchamiam aplikację");
 app.Run();
