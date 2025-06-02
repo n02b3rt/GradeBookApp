@@ -1,0 +1,50 @@
+﻿.subject-table {
+    width: 100%;
+    margin-bottom: 2rem;
+    border-collapse: collapse;
+}
+
+.subject-header {
+    background-color: #fef7ec;
+    font-weight: bold;
+    padding: 0.6rem 1rem;
+    border-top: 2px solid #f39c12;
+    border-bottom: 1px solid #e5e5e5;
+    font-size: 1rem;
+    color: #7a4f01;
+}
+
+.grade-cell {
+    padding: 0.5rem;
+}
+
+.grade-badge {
+    display: inline-block;
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    border-radius: 50%;
+    background-color: #f39c12;
+    color: white;
+    font-weight: bold;
+    text-align: center;
+    font-size: 0.9rem;
+    margin: 3px;
+    position: relative;
+    cursor: default;
+}
+
+.grade-badge:hover::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 125%;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 5px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 10;
+}

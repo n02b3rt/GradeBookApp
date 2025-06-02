@@ -1,0 +1,52 @@
+﻿.day-group {
+    margin-bottom: 2rem;
+    border-left: 4px solid #f39c12;
+    padding-left: 1rem;
+}
+
+.day-header {
+    font-weight: bold;
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #f39c12;
+}
+
+.attendance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px dashed #ddd;
+    padding: 0.4rem 0;
+}
+
+.attendance-subject {
+    font-weight: 500;
+}
+
+.attendance-note {
+    font-style: italic;
+    color: #666;
+    font-size: 0.9rem;
+}
+
+.badge-status {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.85rem;
+    border-radius: 0.35rem;
+    font-weight: 500;
+}
+
+.status-Obecny {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.status-Nieobecny {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.status-Spóźniony {
+    background-color: #f39c12;
+    color: #212529;
+}

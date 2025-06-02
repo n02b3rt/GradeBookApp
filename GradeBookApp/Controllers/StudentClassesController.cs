@@ -1,6 +1,8 @@
 ﻿using GradeBookApp.Services;
-using GradeBookApp.Shared; 
+using GradeBookApp.Shared;
 using Microsoft.AspNetCore.Mvc;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace GradeBookApp.Controllers;
 
@@ -9,20 +11,13 @@ namespace GradeBookApp.Controllers;
 public class StudentClassesController : ControllerBase
 {
     private readonly ClassService _classService;
+    private readonly StudentDataService _studentDataService;
 
-    public StudentClassesController(ClassService classService)
+    public StudentClassesController(ClassService classService,StudentDataService studentDataService)
     {
         _classService = classService;
+        _studentDataService = studentDataService;
     }
-
-    // // POST: api/studentclasses/{classId}/students
-    // [HttpPost("{classId}/students")]
-    // public async Task<IActionResult> AssignStudents(int classId, [FromBody] List<string> studentIds)
-    // {
-    //     var success = await _classService.AssignStudentsToClass(classId, studentIds);
-    //     if (!success) return NotFound();
-    //     return NoContent();
-    // }
 
     // GET: api/studentclasses/{classId}/students
     [HttpGet("{classId}/students")]
@@ -34,4 +29,20 @@ public class StudentClassesController : ControllerBase
         var studentIds = cls.StudentIds ?? new List<string>();
         return Ok(studentIds);
     }
+
+
+    [HttpGet("{studentId}/grades")]
+    public async Task<ActionResult<List<GradeDto>>> GetGradesForStudent(string studentId)
+    {
+        var grades = await _studentDataService.GetGradesByStudentIdAsync(studentId);
+        return Ok(grades);
+    }
+
+    [HttpGet("{studentId}/attendance")]
+    public async Task<ActionResult<List<AttendanceDto>>> GetAttendanceForStudent(string studentId)
+    {
+        var attendance = await _studentDataService.GetAttendanceByStudentIdAsync(studentId);
+        return Ok(attendance);
+    }
+
 }

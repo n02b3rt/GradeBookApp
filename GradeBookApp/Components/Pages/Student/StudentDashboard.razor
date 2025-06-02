@@ -1,9 +1,37 @@
 @page "/student/dashboard"
-@using Microsoft.AspNetCore.Authorization
-@attribute [Authorize(Roles = "Student")]
+@rendermode InteractiveServer
+@inject NavigationManager Nav
 
-<h1>Teacher Dashboard</h1>
+<PageTitle>Panel ucznia</PageTitle>
 
-<p>Witaj, Nauczycielu! To jest Twój panel nauczycielski.</p>
+<div class="container mt-4">
+    <div class="text-center mb-4">
+        <h1 class="display-5">🎓 Panel ucznia</h1>
+        <p class="text-muted">Witaj w swoim panelu. Wybierz, co chcesz zobaczyć:</p>
+    </div>
 
-<!-- Dodaj tutaj dodatkowe funkcjonalności nauczyciela -->
+    <div class="row justify-content-center">
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-outline-primary btn-lg w-100" @onclick="GoToGrades">
+                📊 Moje oceny
+            </button>
+        </div>
+        <div class="col-md-4 mb-3">
+            <button class="btn btn-outline-success btn-lg w-100" @onclick="GoToAttendance">
+                📝 Moja obecność
+            </button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private void GoToGrades()
+    {
+        Nav.NavigateTo("/student/grades");
+    }
+
+    private void GoToAttendance()
+    {
+        Nav.NavigateTo("/student/attendance");
+    }
+}

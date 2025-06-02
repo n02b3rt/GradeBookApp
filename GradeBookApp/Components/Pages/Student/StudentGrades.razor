@@ -1,0 +1,71 @@
+﻿@page "/student/grades"
+@rendermode InteractiveServer
+@using GradeBookApp.Shared
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Moje oceny</PageTitle>
+
+<div class="container mt-4">
+    <h2 class="mb-4 text-center" style="color: #f39c12;">📊 Moje oceny</h2>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border" style="color: #f39c12;" role="status">
+                <span class="visually-hidden">Ładowanie...</span>
+            </div>
+        </div>
+    }
+    else if (!groupedGrades.Any())
+    {
+        <p class="text-muted text-center">Brak ocen.</p>
+    }
+    else
+    {
+        <table class="subject-table">
+            @foreach (var subjectGroup in groupedGrades)
+            {
+                <tr>
+                    <td class="subject-header" colspan="6">@subjectGroup.Key</td>
+                </tr>
+                <tr>
+                    <td class="grade-cell" colspan="6">
+                        @foreach (var grade in subjectGroup.Value)
+                        {
+                            <span class="grade-badge"
+                                  data-tooltip="Waga: @grade.Weight | @grade.Description | @grade.DateGiven.ToShortDateString()">
+                                @grade.Value
+                            </span>
+                        }
+                    </td>
+                </tr>
+            }
+        </table>
+    }
+</div>
+
+@code {
+    private List<GradeDto> grades = new();
+    private Dictionary<string, List<GradeDto>> groupedGrades = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        var user = (await AuthStateProvider.GetAuthenticationStateAsync()).User;
+        var userId = user.FindFirst(c => c.Type.Contains("nameidentifier"))?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            grades = await Http.GetFromJsonAsync<List<GradeDto>>($"api/studentclasses/{userId}/grades") ?? new();
+
+            groupedGrades = grades
+                .GroupBy(g => g.SubjectId) // zamień na SubjectName gdy gotowe
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+
+        isLoading = false;
+    }
+}

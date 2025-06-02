@@ -1,0 +1,72 @@
+﻿@page "/student/attendance"
+@rendermode InteractiveServer
+@using GradeBookApp.Shared
+@inject HttpClient Http
+@inject AuthenticationStateProvider AuthStateProvider
+
+<PageTitle>Moja obecność</PageTitle>
+
+<div class="container mt-4">
+    <h2 class="mb-4 text-success text-center">📝 Moja obecność</h2>
+
+    @if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-success" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (!groupedAttendance.Any())
+    {
+        <p class="text-muted text-center">Brak danych o obecności.</p>
+    }
+    else
+    {
+        @foreach (var day in groupedAttendance)
+        {
+            <div class="day-group">
+                <div class="day-header">@day.Key.ToString("dddd, dd MMMM yyyy")</div>
+                @foreach (var entry in day.Value)
+                {
+                    <div class="attendance-row">
+                        <div>
+                            <div class="attendance-subject">@entry.SubjectId</div> <!-- lub SubjectName -->
+                            @if (!string.IsNullOrWhiteSpace(entry.Note))
+                            {
+                                <div class="attendance-note">@entry.Note</div>
+                            }
+                        </div>
+                        <div>
+                            <span class="badge-status status-@entry.Status">@entry.Status</span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private List<AttendanceDto> attendance = new();
+    private Dictionary<DateOnly, List<AttendanceDto>> groupedAttendance = new();
+    private bool isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        isLoading = true;
+
+        var user = (await AuthStateProvider.GetAuthenticationStateAsync()).User;
+        var userId = user.FindFirst(c => c.Type.Contains("nameidentifier"))?.Value;
+
+        if (!string.IsNullOrEmpty(userId))
+        {
+            attendance = await Http.GetFromJsonAsync<List<AttendanceDto>>($"api/studentclasses/{userId}/attendance") ?? new();
+
+            groupedAttendance = attendance
+                .OrderByDescending(a => a.Date)
+                .GroupBy(a => a.Date)
+                .ToDictionary(g => g.Key, g => g.ToList());
+        }
+
+        isLoading = false;
+    }
+}
