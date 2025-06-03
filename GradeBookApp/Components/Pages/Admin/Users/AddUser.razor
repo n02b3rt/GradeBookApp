@@ -26,33 +26,40 @@
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">🧍 Imię</label>
                         <InputText class="form-control" @bind-Value="newUser.FirstName" />
+                        <ValidationMessage For="() => newUser.FirstName" class="text-danger" />
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">🧍‍♂️ Nazwisko</label>
                         <InputText class="form-control" @bind-Value="newUser.LastName" />
+                        <ValidationMessage For="() => newUser.LastName" class="text-danger" />
                     </div>
 
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">🗓️ Data urodzenia</label>
                         <InputDate class="form-control" @bind-Value="newUser.BirthDate" />
+                        <ValidationMessage For="() => newUser.BirthDate" class="text-danger" />
                     </div>
 
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">⚧️ Płeć</label>
                         <select class="form-select" @bind="genderInput">
+                            <option value="">-- Wybierz płeć --</option>
                             <option value="K">Kobieta</option>
                             <option value="M">Mężczyzna</option>
                         </select>
+                        <ValidationMessage For="() => newUser.Gender" class="text-danger" />
                     </div>
 
                     <div class="col-md-12 mb-3">
                         <label class="form-label fw-semibold">🏠 Adres</label>
                         <InputText class="form-control" @bind-Value="newUser.Address" />
+                        <ValidationMessage For="() => newUser.Address" class="text-danger" />
                     </div>
 
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">🆔 PESEL</label>
                         <InputText class="form-control" @bind-Value="newUser.PESEL" />
+                        <ValidationMessage For="() => newUser.PESEL" class="text-danger" />
                     </div>
 
                     <div class="col-12 mb-3">
@@ -68,6 +75,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold">📅 Data zatrudnienia</label>
                             <InputDate class="form-control" @bind-Value="newUser.HireDate" />
+                            <ValidationMessage For="() => newUser.HireDate" class="text-danger" />
                         </div>
                     }
                     else
@@ -75,6 +83,7 @@
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-semibold">📅 Data rozpoczęcia nauki</label>
                             <InputDate class="form-control" @bind-Value="newUser.EnrollmentDate" />
+                            <ValidationMessage For="() => newUser.EnrollmentDate" class="text-danger" />
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -86,20 +95,9 @@
                                     <option value="@c.Id">@c.Name (@c.Year)</option>
                                 }
                             </select>
+                            <ValidationMessage For="() => newUser.ClassId" class="text-danger" />
                         </div>
                     }
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label fw-semibold">🔒 Hasło</label>
-                        @if (isTeacher || selectedRole == "Admin")
-                        {
-                            <InputText class="form-control" @bind-Value="password" type="password" />
-                        }
-                        else
-                        {
-                            <input class="form-control" value="Szkoła123!" disabled />
-                        }
-                    </div>
 
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-semibold">🔑 Rola</label>
@@ -108,6 +106,20 @@
                             <option value="Teacher">Teacher</option>
                             <option value="Admin">Admin</option>
                         </select>
+                        <ValidationMessage For="() => _selectedRole" class="text-danger" />
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label fw-semibold">🔒 Hasło</label>
+                        @if (isTeacher || selectedRole == "Admin")
+                        {
+                            <InputText class="form-control" @bind-Value="password" type="password" />
+                            <ValidationMessage For="() => password" class="text-danger" />
+                        }
+                        else
+                        {
+                            <input class="form-control" value="Szkoła123!" disabled />
+                        }
                     </div>
                 </div>
 
@@ -124,7 +136,7 @@
     private UserDto newUser = new();
     private string password = "Szkoła123!";
     private string? message;
-    private List<ClassDto>? classes;
+    private List<ClassDto> classes = new();
     private string genderInput = "K";
     private bool isTeacher = false;
 
@@ -165,20 +177,20 @@
     private async Task HandleValidSubmit()
     {
         newUser.Gender = genderInput;
-        var finalRole = isTeacher ? "Teacher" : selectedRole;
+        newUser.Roles = new List<string> { selectedRole };
 
         if (!isTeacher && selectedRole == "Student")
         {
             password = "Szkoła123!";
         }
 
-        if (string.IsNullOrWhiteSpace(password))
+        if ((isTeacher || selectedRole == "Admin") && string.IsNullOrWhiteSpace(password))
         {
             message = "Hasło jest wymagane.";
             return;
         }
 
-        var result = await UserService.CreateUserAsync(newUser, password, finalRole);
+        var result = await UserService.CreateUserAsync(newUser, password, selectedRole);
         if (result.Succeeded)
         {
             message = $"✅ Użytkownik dodany. Login: {newUser.UserName}, Email: {newUser.Email}";
