@@ -45,6 +45,7 @@ builder.Services.AddScoped<ApplicationDbContext>(sp =>
     sp.GetRequiredService<IDbContextFactory<ApplicationDbContext>>().CreateDbContext());
 
 // === 4. Identity (cookie-based auth)
+//     Używamy klasy ApplicationUser (dziedziczy po IdentityUser)
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
     options.SignIn.RequireConfirmedAccount = false;
@@ -65,9 +66,9 @@ builder.Services.ConfigureApplicationCookie(options =>
     options.AccessDeniedPath = "/Account/AccessDenied";
 });
 
-// === 5.  serwisy
+// === 5. Rejestracja pozostałych serwisów (po konfiguracji Identity)
 builder.Services.AddScoped<ClassService>();
-builder.Services.AddScoped<SubjectService>();
+builder.Services.AddScoped<SubjectService>();           // SubjectService wstrzykuje UserManager<ApplicationUser>
 builder.Services.AddScoped<TeacherSubjectService>();
 builder.Services.AddScoped<StudentClassService>();
 builder.Services.AddScoped<UserService>();
@@ -75,6 +76,7 @@ builder.Services.AddScoped<StudentDataService>();
 builder.Services.AddScoped<TeacherActionsService>();
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
+// === 6. Blazor + MVC + AuthenticationState
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 builder.Services.AddControllers();
@@ -89,7 +91,7 @@ builder.Services.AddServerSideBlazor()
 
 builder.Services.AddHttpContextAccessor();
 
-// === 6. HttpClient z cookies (jeśli coś wysyłasz lokalnie)
+// === 7. HttpClient z cookies (jeśli wysyłasz żądania lokalnie)
 builder.Services.AddScoped<HttpClient>(sp =>
 {
     var httpContextAccessor = sp.GetRequiredService<IHttpContextAccessor>();
@@ -109,13 +111,13 @@ builder.Services.AddScoped<HttpClient>(sp =>
 
     return new HttpClient(handler)
     {
-        BaseAddress = new Uri("https://localhost:7264") // dopasuj, jeśli inny port
+        BaseAddress = new Uri("https://localhost:7264") // dostosuj port do swojego projektu
     };
 });
 
 var app = builder.Build();
 
-// === 7. Middleware
+// === 8. Middleware pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
@@ -129,15 +131,18 @@ else
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-app.UseAuthentication(); // tylko Identity cookie
+
+app.UseAuthentication(); // musi być przed UseAuthorization()
 app.UseAuthorization();
+
 app.UseAntiforgery();
 
+// Mapowanie endpointów
 app.MapControllers();
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapAdditionalIdentityEndpoints();
 
-// === 8. Migracje + seedy
+// === 9. Migracje + seedy
 using (var scope = app.Services.CreateScope())
 {
     var ctxFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
@@ -154,7 +159,7 @@ using (var scope = app.Services.CreateScope())
     Console.WriteLine("[Program] DbSeeder.SeedAsync (UNCONDITIONAL) end");
 }
 
-// === 8. Migracje + Seedy (Z CZYSZCZENIEM BAZY)
+// === 9. Migracje + Seedy (Z CZYSZCZENIEM BAZY)
 // using (var scope = app.Services.CreateScope())
 // {
 //     var ctxFactory = scope.ServiceProvider.GetRequiredService<IDbContextFactory<ApplicationDbContext>>();
@@ -163,17 +168,17 @@ using (var scope = app.Services.CreateScope())
 //     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 //     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 //
-//     Console.WriteLine("[Program] ❗ Czyszczenie bazy danych...");
+//     Console.WriteLine("[Program] Czyszczenie bazy danych...");
 //     await dbContext.Database.EnsureDeletedAsync(); // <--- CZYŚCIMY
-//     Console.WriteLine("[Program] ✔ Baza usunięta.");
+//     Console.WriteLine("[Program] Baza usunięta.");
 //
-//     Console.WriteLine("[Program] 🛠 Wykonywanie migracji...");
+//     Console.WriteLine("[Program] Wykonywanie migracji...");
 //     await dbContext.Database.MigrateAsync();
-//     Console.WriteLine("[Program] ✔ Migracje zastosowane.");
+//     Console.WriteLine("[Program] Migracje zastosowane.");
 //
-//     Console.WriteLine("[Program] 🌱 Seed danych (start)...");
+//     Console.WriteLine("[Program] Seed danych (start)...");
 //     await DbSeeder.SeedAsync(dbContext, userManager, roleManager);
-//     Console.WriteLine("[Program] 🌱 Seed danych (koniec).");
+//     Console.WriteLine("[Program] Seed danych (koniec).");
 // }
 
 

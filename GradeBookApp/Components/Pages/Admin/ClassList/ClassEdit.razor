@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 
 @using GradeBookApp.Shared
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
 
 <div class="container mt-4">
@@ -12,38 +13,47 @@
 
     @if (editClass == null)
     {
-        <div class="text-muted">⏳ Ładowanie danych klasy...</div>
+        <div class="text-muted">Ładowanie danych klasy...</div>
     }
     else
     {
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body">
-                <EditForm Model="editClass" OnValidSubmit="HandleValidSubmit" FormName="EditClassForm">
+                <EditForm Model="editClass" OnValidSubmit="HandleValidSubmit">
                     <DataAnnotationsValidator />
                     <ValidationSummary class="mb-3 text-danger" />
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">📛 Nazwa klasy</label>
-                        <InputText class="form-control" @bind-Value="editClass.Name" />
+                        <label class="form-label fw-semibold">Nazwa klasy</label>
+                        <InputText
+                            class="form-control"
+                            @bind-Value="editClass.Name" />
+                        <ValidationMessage For="() => editClass.Name" class="text-danger" />
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">📅 Rok rozpoczęcia</label>
-                        <InputNumber class="form-control" @bind-Value="editClass.Year" />
+                        <label class="form-label fw-semibold">Rok rozpoczęcia</label>
+                        <InputNumber
+                            class="form-control"
+                            @bind-Value="editClass.Year" />
+                        <ValidationMessage For="() => editClass.Year" class="text-danger" />
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-semibold">👨‍🏫 Wychowawca</label>
-                        <select class="form-select" @bind="editClass.TeacherId">
+                        <label class="form-label fw-semibold">Wychowawca</label>
+                        <select
+                            class="form-select"
+                            @bind="editClass.TeacherId">
                             <option value="">-- Wybierz wychowawcę --</option>
                             @if (teachers != null)
                             {
                                 @foreach (var t in teachers)
                                 {
-                                    <option value="@t.Id">@t.FirstName @t.LastName (@t.Email)</option>
+                                    <option value="@t.Id">@t.FullName (@t.Email)</option>
                                 }
                             }
                         </select>
+                        <ValidationMessage For="() => editClass.TeacherId" class="text-danger" />
                     </div>
 
                     <div class="d-flex justify-content-end">
@@ -77,6 +87,7 @@
     {
         try
         {
+            // Pobierz istniejące dane klasy (domyślnie ClassEditModel ma te same pola co DTO)
             editClass = await Http.GetFromJsonAsync<ClassEditModel>($"api/classes/{ClassId}");
             teachers = await Http.GetFromJsonAsync<List<UserDto>>("api/teachers");
         }
@@ -88,7 +99,8 @@
 
     async Task HandleValidSubmit()
     {
-        if (editClass == null) return;
+        if (editClass == null) 
+            return;
 
         try
         {
@@ -114,11 +126,32 @@
         Navigation.NavigateTo("/admin/dashboard/classes");
     }
 
-    public class ClassEditModel
+    public class ClassEditModel : IValidatableObject
     {
         public int Id { get; set; }
-        public string Name { get; set; } = "";
+
+        [Required(ErrorMessage = "Nazwa klasy jest wymagana.")]
+        [RegularExpression("^[4-8][A-F]$", ErrorMessage = "Nazwa klasy musi składać się z cyfry 4–8 i litery A–F (np. 4A, 6C).")]
+        public string Name { get; set; } = string.Empty;
+
         public int Year { get; set; }
-        public string TeacherId { get; set; } = "";
+
+        [Required(ErrorMessage = "Wybór wychowawcy jest obowiązkowy.")]
+        public string TeacherId { get; set; } = string.Empty;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            int currentYear = DateTime.Now.Year;
+            int minYear = currentYear - 4;
+            int maxYear = currentYear;
+
+            if (Year < minYear || Year > maxYear)
+            {
+                yield return new ValidationResult(
+                    $"Rok musi być pomiędzy {minYear} a {maxYear}.",
+                    new[] { nameof(Year) }
+                );
+            }
+        }
     }
 }

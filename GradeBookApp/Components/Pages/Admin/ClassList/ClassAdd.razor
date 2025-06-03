@@ -5,6 +5,7 @@
 @inject NavigationManager Navigation
 
 @using GradeBookApp.Shared
+@using System.ComponentModel.DataAnnotations
 @using Microsoft.AspNetCore.Authorization
 
 <div class="container py-4">
@@ -17,18 +18,26 @@
                 <ValidationSummary class="mb-3 text-danger" />
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">📛 Nazwa klasy</label>
-                    <InputText class="form-control" @bind-Value="newClass.Name" />
+                    <label class="form-label fw-semibold">Nazwa klasy</label>
+                    <InputText
+                        class="form-control"
+                        @bind-Value="newClass.Name" />
+                    <ValidationMessage For="() => newClass.Name" class="text-danger" />
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">📅 Rok rozpoczęcia</label>
-                    <InputNumber class="form-control" @bind-Value="newClass.Year" />
+                    <label class="form-label fw-semibold">Rok rozpoczęcia</label>
+                    <InputNumber
+                        class="form-control"
+                        @bind-Value="newClass.Year" />
+                    <ValidationMessage For="() => newClass.Year" class="text-danger" />
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">👨‍🏫 Wychowawca</label>
-                    <select class="form-select" @bind="newClass.TeacherId">
+                    <label class="form-label fw-semibold">Wychowawca</label>
+                    <select
+                        class="form-select"
+                        @bind="newClass.TeacherId">
                         <option value="">-- Wybierz wychowawcę --</option>
                         @if (teachers != null)
                         {
@@ -38,6 +47,7 @@
                             }
                         }
                     </select>
+                    <ValidationMessage For="() => newClass.TeacherId" class="text-danger" />
                 </div>
 
                 <div class="d-flex justify-content-end">
@@ -59,7 +69,7 @@
 </div>
 
 @code {
-    private ClassAddModel newClass = new();
+    private ClassDto newClass = new();     // <-- używamy ClassDto zamiast ClassAddModel
     private string? message;
     private List<UserDto>? teachers;
 
@@ -105,12 +115,5 @@
     private void NavigateToList()
     {
         Navigation.NavigateTo("/admin/dashboard/classes");
-    }
-
-    public class ClassAddModel
-    {
-        public string Name { get; set; } = string.Empty;
-        public int Year { get; set; }
-        public string TeacherId { get; set; } = string.Empty;
     }
 }
