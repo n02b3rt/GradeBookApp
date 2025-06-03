@@ -22,13 +22,28 @@
                 <ValidationSummary class="mb-3 text-danger" />
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold text-dark">📘 Nazwa przedmiotu</label>
+                    <label class="form-label fw-semibold text-dark">Nazwa przedmiotu</label>
                     <InputText class="form-control" @bind-Value="newSubject.Name" placeholder="Np. Matematyka" />
+                    <ValidationMessage For="() => newSubject.Name" class="text-danger" />
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold text-dark">🔤 Skrót</label>
+                    <label class="form-label fw-semibold text-dark">Skrót</label>
                     <InputText class="form-control" @bind-Value="newSubject.ShortName" placeholder="Np. MATH" />
+                    <ValidationMessage For="() => newSubject.ShortName" class="text-danger" />
+                </div>
+
+                <!-- Dropdown wyboru nauczyciela -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold text-dark">Wybierz nauczyciela</label>
+                    <InputSelect class="form-select" @bind-Value="selectedTeacherId">
+                        <option value="">-- wybierz nauczyciela --</option>
+                        @foreach (var t in teachers)
+                        {
+                            <option value="@t.Id">@t.FullName</option>
+                        }
+                    </InputSelect>
+                    <ValidationMessage For="() => selectedTeacherId" class="text-danger" />
                 </div>
 
                 <div class="d-flex justify-content-end">
@@ -46,22 +61,88 @@
 
 @code {
     private SubjectDto newSubject = new();
+    private List<UserDto> teachers = new();
+    private List<ClassDto> classes = new();
+    private string selectedTeacherId = "";
     private string? message;
 
-    private async Task HandleValidSubmit()
+    protected override async Task OnInitializedAsync()
     {
         try
         {
-            var resp = await Http.PostAsJsonAsync("api/subjects", newSubject);
-            if (resp.IsSuccessStatusCode)
+            teachers = await Http.GetFromJsonAsync<List<UserDto>>("api/teachers")
+                       ?? new List<UserDto>();
+
+            // Pobierz wszystkie klasy
+            classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes")
+                      ?? new List<ClassDto>();
+
+            if (classes.Count == 0)
             {
-                Navigation.NavigateTo("/admin/dashboard/subjects");
+                message = "❗ Brak dostępnych klas w bazie.";
             }
-            else
+        }
+        catch (Exception ex)
+        {
+            message = $"❗ Błąd przy wczytywaniu danych: {ex.Message}";
+        }
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (string.IsNullOrWhiteSpace(selectedTeacherId))
+        {
+            message = "❗ Musisz wybrać nauczyciela.";
+            return;
+        }
+
+        if (classes.Count == 0)
+        {
+            message = "❗ Nie można przypisać, bo brak klas.";
+            return;
+        }
+
+        try
+        {
+            // 1️⃣ Utwórz nowy przedmiot (SubjectDto)
+            var createResp = await Http.PostAsJsonAsync("api/subjects", newSubject);
+            if (!createResp.IsSuccessStatusCode)
             {
-                var error = await resp.Content.ReadAsStringAsync();
-                message = $"❗ Błąd przy dodawaniu: {error}";
+                var error = await createResp.Content.ReadAsStringAsync();
+                message = $"❗ Błąd przy dodawaniu przedmiotu: {error}";
+                return;
             }
+
+            var createdSubject = await createResp.Content.ReadFromJsonAsync<SubjectDto>();
+            if (createdSubject == null || string.IsNullOrEmpty(createdSubject.Id))
+            {
+                message = "❗ Nie udało się odczytać ID nowo utworzonego przedmiotu.";
+                return;
+            }
+
+            // 2️⃣ Dla każdej klasy stwórz przypisanie
+            foreach (var c in classes)
+            {
+                var assignDto = new AssignTeacherSubjectDto
+                {
+                    SubjectId = createdSubject.Id,
+                    TeacherId = selectedTeacherId,
+                    ClassId = c.Id
+                };
+
+                var assignResp = await Http.PostAsJsonAsync("api/teachersubjects", assignDto);
+                if (!assignResp.IsSuccessStatusCode)
+                {
+                    // Jeśli którekolwiek przypisanie się nie uda, usuń przedmiot i przerwij
+                    await Http.DeleteAsync($"api/subjects/{createdSubject.Id}");
+                    var errorAssign = await assignResp.Content.ReadAsStringAsync();
+                    message = $"❗ Błąd przy przypisywaniu nauczyciela do klasy {c.Name}: {errorAssign}";
+                    return;
+                }
+            }
+
+            // Sukces → przekieruj na listę przedmiotów
+            Navigation.NavigateTo("/admin/dashboard/subjects");
         }
         catch (Exception ex)
         {
@@ -72,5 +153,18 @@
     private void Cancel()
     {
         Navigation.NavigateTo("/admin/dashboard/subjects");
+    }
+
+    private class ClassDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    private class AssignTeacherSubjectDto
+    {
+        public string TeacherId { get; set; } = string.Empty;
+        public string SubjectId { get; set; } = string.Empty;
+        public int ClassId { get; set; }
     }
 }

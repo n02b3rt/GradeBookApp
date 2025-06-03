@@ -7,6 +7,7 @@
 @using GradeBookApp.Shared
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Forms
+
 <div class="container">
     <h2 class="mb-4 fw-bold text-dark">✏️ Edytuj przedmiot</h2>
 
@@ -30,11 +31,26 @@
                     <div class="mb-3">
                         <label class="form-label fw-semibold">📘 Nazwa przedmiotu</label>
                         <InputText class="form-control" @bind-Value="subject.Name" />
+                        <ValidationMessage For="() => subject.Name" class="text-danger" />
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label fw-semibold">🔤 Skrót</label>
                         <InputText class="form-control" @bind-Value="subject.ShortName" />
+                        <ValidationMessage For="() => subject.ShortName" class="text-danger" />
+                    </div>
+
+                    <!-- Dropdown wyboru nauczyciela -->
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">👩‍🏫 Wybierz nauczyciela</label>
+                        <InputSelect class="form-select" @bind-Value="selectedTeacherId">
+                            <option value="">-- wybierz nauczyciela --</option>
+                            @foreach (var t in teachers)
+                            {
+                                <option value="@t.Id">@t.FullName</option>
+                            }
+                        </InputSelect>
+                        <ValidationMessage For="() => selectedTeacherId" class="text-danger" />
                     </div>
 
                     <div class="d-flex justify-content-end">
@@ -51,22 +67,42 @@
     }
 </div>
 
-
 @code {
     [Parameter]
     public string Id { get; set; } = "";
 
     private SubjectDto? subject;
+    private TeacherSubjectDto? existingAssignment; // używane tylko do usunięcia pojedynczego pobranego, ale będziemy usuwać wszystkie
+    private List<UserDto> teachers = new();
+    private List<ClassDto> classes = new();
+    private string selectedTeacherId = "";
     private string? message;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
+            // 1. Wczytaj SubjectDto
             subject = await Http.GetFromJsonAsync<SubjectDto>($"api/subjects/{Id}");
             if (subject == null)
             {
                 message = "❗ Nie znaleziono przedmiotu.";
+                return;
+            }
+
+            // 2. Wczytaj nauczycieli (rola "Teacher")
+            teachers = await Http.GetFromJsonAsync<List<UserDto>>("api/teachers")
+                       ?? new List<UserDto>();
+
+            // 3. Wczytaj wszystkie klasy
+            classes = await Http.GetFromJsonAsync<List<ClassDto>>("api/classes")
+                      ?? new List<ClassDto>();
+
+            // 4. Wczytaj jedno przykładowe przypisanie (jeśli istnieje)
+            existingAssignment = await Http.GetFromJsonAsync<TeacherSubjectDto>($"api/subjects/{Id}/assignment");
+            if (existingAssignment != null)
+            {
+                selectedTeacherId = existingAssignment.TeacherId;
             }
         }
         catch (Exception ex)
@@ -77,18 +113,56 @@
 
     private async Task HandleValidSubmit()
     {
+        if (subject == null)
+            return;
+
+        if (string.IsNullOrWhiteSpace(selectedTeacherId))
+        {
+            message = "❗ Musisz wybrać nauczyciela.";
+            return;
+        }
+
         try
         {
-            var response = await Http.PutAsJsonAsync($"api/subjects/{Id}", subject);
-            if (response.IsSuccessStatusCode)
+            // 1️⃣ Zaktualizuj nazwę i skrót przedmiotu
+            var updateResp = await Http.PutAsJsonAsync($"api/subjects/{Id}", subject);
+            if (!updateResp.IsSuccessStatusCode)
             {
-                Navigation.NavigateTo("/admin/dashboard/subjects");
+                var error = await updateResp.Content.ReadAsStringAsync();
+                message = $"❗ Błąd aktualizacji przedmiotu: {error}";
+                return;
             }
-            else
+
+            // 2️⃣ Usuń WSZYSTKIE istniejące przypisania tego przedmiotu
+            var existingList = await Http.GetFromJsonAsync<List<TeacherSubjectDto>>($"api/subjects/{Id}/all-assignments");
+            if (existingList != null)
             {
-                var error = await response.Content.ReadAsStringAsync();
-                message = $"❗ Błąd aktualizacji: {error}";
+                foreach (var assign in existingList)
+                {
+                    await Http.DeleteAsync($"api/teachersubjects/{assign.Id}");
+                }
             }
+
+            // 3️⃣ Utwórz nowe przypisania dla każdej klasy
+            foreach (var c in classes)
+            {
+                var assignDto = new AssignTeacherSubjectDto
+                {
+                    SubjectId = Id,
+                    TeacherId = selectedTeacherId,
+                    ClassId = c.Id
+                };
+                var assignResp = await Http.PostAsJsonAsync("api/teachersubjects", assignDto);
+                if (!assignResp.IsSuccessStatusCode)
+                {
+                    var errorAssign = await assignResp.Content.ReadAsStringAsync();
+                    message = $"❗ Błąd przy przypisywaniu nauczyciela do klasy {c.Name}: {errorAssign}";
+                    return;
+                }
+            }
+
+            // 4️⃣ Sukces → przekierowanie
+            Navigation.NavigateTo("/admin/dashboard/subjects");
         }
         catch (Exception ex)
         {
@@ -99,5 +173,18 @@
     private void Cancel()
     {
         Navigation.NavigateTo("/admin/dashboard/subjects");
+    }
+
+    private class ClassDto
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = "";
+    }
+
+    private class AssignTeacherSubjectDto
+    {
+        public string TeacherId { get; set; } = string.Empty;
+        public string SubjectId { get; set; } = string.Empty;
+        public int ClassId { get; set; }
     }
 }

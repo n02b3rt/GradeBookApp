@@ -1,58 +1,107 @@
 ﻿using GradeBookApp.Data;
 using GradeBookApp.Data.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
-namespace GradeBookApp.Services;
-
-public class TeacherSubjectService
+namespace GradeBookApp.Services
 {
-    private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
-
-    public TeacherSubjectService(IDbContextFactory<ApplicationDbContext> contextFactory)
+    public class TeacherSubjectService
     {
-        _contextFactory = contextFactory;
-    }
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-    // Pobierz wszystkie przypisania nauczycieli do przedmiotów i klas
-    public async Task<List<TeacherSubject>> GetTeacherSubjectsAsync()
-    {
-        using var context = _contextFactory.CreateDbContext();
-        return await context.TeacherSubjects
-            .Include(ts => ts.Teacher)
-            .Include(ts => ts.Subject)
-            .Include(ts => ts.Class)
-            .ToListAsync();
-    }
-
-    // Przypisz nauczyciela do przedmiotu i klasy
-    public async Task<bool> AssignTeacherToSubjectAndClass(string teacherId, string subjectId, int classId)
-    {
-        using var context = _contextFactory.CreateDbContext();
-        var exists = await context.TeacherSubjects.AnyAsync(ts =>
-            ts.TeacherId == teacherId && ts.SubjectId == subjectId && ts.ClassId == classId);
-        if (exists) return false;
-
-        var ts = new TeacherSubject
+        public TeacherSubjectService(
+            IDbContextFactory<ApplicationDbContext> contextFactory,
+            UserManager<ApplicationUser> userManager)
         {
-            TeacherId = teacherId,
-            SubjectId = subjectId,
-            ClassId = classId
-        };
+            _contextFactory = contextFactory;
+            _userManager = userManager;
+        }
 
-        context.TeacherSubjects.Add(ts);
-        await context.SaveChangesAsync();
-        return true;
-    }
+        // Pobiera wszystkie przypisania (TeacherSubject)
+        public async Task<List<TeacherSubject>> GetTeacherSubjectsAsync()
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+            return await ctx.TeacherSubjects
+                            .AsNoTracking()
+                            .ToListAsync();
+        }
 
-    // Usuń przypisanie
-    public async Task<bool> RemoveTeacherSubjectAssignment(string id)
-    {
-        using var context = _contextFactory.CreateDbContext();
-        var ts = await context.TeacherSubjects.FindAsync(id);
-        if (ts == null) return false;
+        // Pobiera jedno przypisanie po Id
+        public async Task<TeacherSubject?> GetByIdAsync(string id)
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+            return await ctx.TeacherSubjects
+                            .AsNoTracking()
+                            .FirstOrDefaultAsync(ts => ts.Id == id);
+        }
 
-        context.TeacherSubjects.Remove(ts);
-        await context.SaveChangesAsync();
-        return true;
+        // Sprawdza, czy w bazie istnieje przedmiot o danym Id
+        public async Task<bool> SubjectExistsAsync(string subjectId)
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+            return await ctx.Subjects
+                            .AsNoTracking()
+                            .AnyAsync(s => s.Id == subjectId);
+        }
+
+        // Sprawdza, czy w Identity istnieje użytkownik o danym Id
+        public async Task<bool> TeacherExistsAsync(string teacherId)
+        {
+            var user = await _userManager.FindByIdAsync(teacherId);
+            return user != null;
+        }
+
+        // Sprawdza, czy istnieje przypisanie z tymi samymi SubjectId, TeacherId i ClassId
+        public async Task<bool> ExistsAsync(string subjectId, string teacherId, int classId)
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+            return await ctx.TeacherSubjects
+                            .AsNoTracking()
+                            .AnyAsync(ts =>
+                                ts.SubjectId == subjectId &&
+                                ts.TeacherId == teacherId &&
+                                ts.ClassId == classId);
+        }
+
+        /// <summary>
+        /// Tworzy nowe przypisanie Teacher–Subject–Class i zwraca jego Id.
+        /// Zakłada, że przed wykonaniem tej metody sprawdzono:
+        ///     - czy Subject o subjectId istnieje (SubjectExistsAsync),
+        ///     - czy użytkownik (teacher) istnieje (TeacherExistsAsync),
+        ///     - czy nie istnieje duplikat (ExistsAsync).
+        /// </summary>
+        public async Task<string> AssignTeacherToSubjectAndClass(string teacherId, string subjectId, int classId)
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+
+            var entity = new TeacherSubject
+            {
+                Id = Guid.NewGuid().ToString(),
+                TeacherId = teacherId,
+                SubjectId = subjectId,
+                ClassId = classId
+            };
+
+            ctx.TeacherSubjects.Add(entity);
+            await ctx.SaveChangesAsync();
+            return entity.Id;
+        }
+
+        // Usuwa przypisanie po Id
+        public async Task<bool> RemoveTeacherSubjectAssignment(string id)
+        {
+            using var ctx = _contextFactory.CreateDbContext();
+            var entity = await ctx.TeacherSubjects.FindAsync(id);
+            if (entity == null)
+                return false;
+
+            ctx.TeacherSubjects.Remove(entity);
+            await ctx.SaveChangesAsync();
+            return true;
+        }
     }
 }
